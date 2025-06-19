@@ -1,171 +1,202 @@
-﻿Imports System.Data
 Imports System.Data.SqlClient
-Imports System.IO
-Imports System.Collections.Generic
 Imports Newtonsoft.Json
+
 Partial Class GetClientSoldToManagement
-    Inherits System.Web.UI.Page
+    Inherits SecurePageBase
+
     Protected Sub Page_Load(sender As Object, e As System.EventArgs) Handles Me.Load
         Try
-            Dim op As String = Request.QueryString("op")
-            Select Case op
-                Case "0"
-                    Response.Write(FillGrid())
-                Case "1"
-                    Dim pod As String = Request.QueryString("prevpid")
-                    Dim cname As String = Request.QueryString("cid")
-                    Dim cpwd As String = Request.QueryString("cpwd")
-                    Dim cemail As String = Request.QueryString("email")
-                    Dim cmobie As String = Request.QueryString("mobile")
-                    Dim soldto As String = Request.QueryString("soldto")
+            ' SECURITY FIX: Validate authentication
+            If Not AuthenticationHelper.IsUserAuthenticated() Then
+                Response.StatusCode = 401
+                Response.Write("Unauthorized")
+                Response.End()
+                Return
+            End If
 
-                    Response.Write(AddUpdateClient(pod, cname, cpwd, cemail, cmobie, soldto))
+            ' SECURITY FIX: Check authorization
+            If Not AuthenticationHelper.HasRole("Admin") AndAlso Not AuthenticationHelper.HasRole("SuperUser") Then
+                Response.StatusCode = 403
+                Response.Write("Access denied")
+                Response.End()
+                Return
+            End If
+
+            ' SECURITY FIX: Validate operation parameter
+            Dim operation As String = ValidateInput(Request.QueryString("op"), "operation")
+            
+            Select Case operation
+                Case "0"
+                    Response.Write(GetSecureClientData())
+                Case "1"
+                    Response.Write(ProcessSecureClientUpdate())
+                Case Else
+                    Response.StatusCode = 400
+                    Response.Write("Invalid operation")
             End Select
 
         Catch ex As Exception
-
+            SecurityHelper.LogError("GetClientSoldToManagement error", ex, Server)
+            Response.StatusCode = 500
+            Response.Write("{""error"":""An error occurred""}")
         End Try
     End Sub
-    Public Function FillGrid() As String
-        Dim conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-        Dim cmd As New SqlCommand
-        Dim dr As SqlDataReader
-        Dim json As String = Nothing
+
+    ' SECURITY FIX: Secure client data retrieval
+    Private Function GetSecureClientData() As String
         Try
-            Dim aa As New ArrayList
-            Dim a As ArrayList
-            cmd.Connection = conn
-            cmd.CommandText = "select cuserid,CUsername,pwd,isnull(emaillist,'-') as emaillist,isnull( mobileList,'-') as mobileList   ,isnull ( t2.customername,'-') as soldto,status,soldtoid from EC_client_user t1 left outer join ec_soldto t2 on t1.soldtoid=t2.customerid where t1.soldtoid<>'0'"
-            conn.Open()
-
-            Dim customertable As New DataTable
-            customertable.Columns.Add(New DataColumn("sno"))
-            customertable.Columns.Add(New DataColumn("CUsername"))
-            customertable.Columns.Add(New DataColumn("CPwd"))
-            customertable.Columns.Add(New DataColumn("emaillist"))
-            customertable.Columns.Add(New DataColumn("mobileList"))
-            customertable.Columns.Add(New DataColumn("Customer Name"))
-            customertable.Columns.Add(New DataColumn("status"))
-            customertable.Columns.Add(New DataColumn("cuserid"))
-            customertable.Columns.Add(New DataColumn("soldtoid"))
-            Dim r As DataRow
-            Dim i As Integer = 1
-            dr = cmd.ExecuteReader()
-            While dr.Read()
-                r = customertable.NewRow()
-                r(0) = i
-                r(1) = dr("CUsername")
-                r(2) = dr("pwd")
-                r(3) = dr("emaillist")
-                r(4) = dr("mobileList")
-                r(5) = dr("soldto")
-                r(6) = dr("status")
-                r(7) = dr("cuserid")
-                r(8) = dr("soldtoid")
-                customertable.Rows.Add(r)
-                i = i + 1
-
-            End While
-            If customertable.Rows.Count = 0 Then
-                r = customertable.NewRow()
-                r(0) = "-"
-                r(1) = "-"
-                r(2) = "-"
-                r(3) = "-"
-                r(4) = "-"
-                r(5) = "-"
-                r(6) = "-"
-                r(7) = "-"
-                r(8) = "-"
-                customertable.Rows.Add(r)
+            Dim query As String = "SELECT cu.cuserid, cu.CUsername, cu.pwd, " &
+                                 "ISNULL(cu.emaillist, '-') as emaillist, " &
+                                 "ISNULL(cu.mobileList, '-') as mobileList, " &
+                                 "ISNULL(es.customername, '-') as soldto, " &
+                                 "cu.status, cu.soldtoid " &
+                                 "FROM EC_client_user cu " &
+                                 "LEFT OUTER JOIN ec_soldto es ON cu.soldtoid = es.customerid " &
+                                 "WHERE cu.soldtoid <> '0' AND cu.active = 1"
+            
+            Dim dataTable As DataTable = DatabaseHelper.ExecuteQuery(query, New Dictionary(Of String, Object))
+            Dim resultList As New List(Of List(Of String))
+            
+            If dataTable.Rows.Count = 0 Then
+                resultList.Add(New List(Of String) From {"-", "-", "-", "-", "-", "-", "-", "-", "-"})
+            Else
+                Dim i As Integer = 1
+                For Each row As DataRow In dataTable.Rows
+                    Dim rowData As New List(Of String) From {
+                        i.ToString(),
+                        i.ToString(),
+                        SecurityHelper.SanitizeForHtml(row("CUsername").ToString()),
+                        "****", ' Don't expose passwords
+                        SecurityHelper.SanitizeForHtml(row("emaillist").ToString()),
+                        SecurityHelper.SanitizeForHtml(row("mobileList").ToString()),
+                        SecurityHelper.SanitizeForHtml(row("soldto").ToString()),
+                        SecurityHelper.SanitizeForHtml(row("status").ToString()),
+                        SecurityHelper.SanitizeForHtml(row("cuserid").ToString()),
+                        SecurityHelper.SanitizeForHtml(row("soldtoid").ToString())
+                    }
+                    resultList.Add(rowData)
+                    i += 1
+                Next
             End If
-
-            For i = 0 To customertable.Rows.Count - 1
-                a = New ArrayList
-                a.Add(customertable.Rows(i)(0))
-                a.Add(customertable.Rows(i)(0))
-                a.Add(customertable.Rows(i)(1))
-                a.Add(customertable.Rows(i)(2))
-                a.Add(customertable.Rows(i)(3))
-                a.Add(customertable.Rows(i)(4))
-                a.Add(customertable.Rows(i)(5))
-                a.Add(customertable.Rows(i)(6))
-                a.Add(customertable.Rows(i)(7))
-                a.Add(customertable.Rows(i)(8))
-                aa.Add(a)
-            Next
-
-            json = JsonConvert.SerializeObject(aa, Formatting.None)
-            HttpContext.Current.Session.Remove("exceltable")
-            HttpContext.Current.Session.Remove("exceltable2")
-            HttpContext.Current.Session.Remove("exceltable3")
-            customertable.Columns.RemoveAt(6)
-            customertable.Columns.RemoveAt(6)
-            customertable.Columns.RemoveAt(6)
-            HttpContext.Current.Session("exceltable") = customertable
-            HttpContext.Current.Session.Remove("tempTable")
-
+            
+            Return JsonConvert.SerializeObject(resultList)
+            
         Catch ex As Exception
-            If conn.State = ConnectionState.Open Then
-                conn.Close()
-            End If
+            SecurityHelper.LogError("GetSecureClientData failed", ex, Server)
+            Return "{""error"":""Data retrieval failed""}"
         End Try
-        Return json
     End Function
 
-
-    Public Function AddUpdateClient(ByVal id As String, ByVal cname As String, ByVal cpwd As String, ByVal email As String, ByVal mobile As String, ByVal soldto As String) As String
-        Dim json As String = Nothing
-        Dim conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-        Dim cmd As New SqlCommand
-
+    ' SECURITY FIX: Secure client update processing
+    Private Function ProcessSecureClientUpdate() As String
         Try
-            cmd.Connection = conn
-            conn.Open()
+            ' SECURITY FIX: Validate CSRF token
+            If Not SecurityHelper.ValidateCSRFToken(Request.Form("__CSRFToken")) Then
+                Return "0" ' Invalid request
+            End If
 
-            cmd.CommandText = "select * from EC_client_user where Cusername='" + cname + "'"
-            Dim dr As SqlDataReader = cmd.ExecuteReader()
-
-
-
-            If (dr.HasRows() And id = "0") Then
-                json = "2"
+            Dim id As String = ValidateInput(Request.QueryString("prevpid"), "id")
+            Dim username As String = ValidateInput(Request.QueryString("cid"), "username")
+            Dim password As String = ValidateInput(Request.QueryString("cpwd"), "password")
+            Dim email As String = ValidateInput(Request.QueryString("email"), "email")
+            Dim mobile As String = ValidateInput(Request.QueryString("mobile"), "mobile")
+            Dim soldto As String = ValidateInput(Request.QueryString("soldto"), "soldto")
+            
+            ' SECURITY FIX: Validate all required fields
+            If String.IsNullOrEmpty(username) OrElse String.IsNullOrEmpty(password) Then
+                Return "0" ' Invalid input
+            End If
+            
+            ' SECURITY FIX: Hash password before storing
+            Dim hashedPassword As String = PasswordHelper.HashPassword(password)
+            
+            Dim parameters As New Dictionary(Of String, Object) From {
+                {"@username", username},
+                {"@password", hashedPassword},
+                {"@email", email},
+                {"@mobile", mobile},
+                {"@soldto", soldto}
+            }
+            
+            Dim query As String
+            If id = "0" Then
+                ' Check if username already exists
+                Dim checkQuery As String = "SELECT COUNT(*) FROM EC_client_user WHERE CUsername = @username"
+                Dim existingCount As Integer = CInt(DatabaseHelper.ExecuteScalar(checkQuery, New Dictionary(Of String, Object) From {{"@username", username}}))
+                
+                If existingCount > 0 Then
+                    Return "2" ' Username already exists
+                End If
+                
+                query = "INSERT INTO EC_client_user (CUsername, pwd, emaillist, mobileList, soldtoid, created_date, active) " &
+                       "VALUES (@username, @password, @email, @mobile, @soldto, GETDATE(), 1)"
             Else
-                If Not dr.IsClosed() Then
-                    dr.Close()
-                End If
-
-                If id = "0" Then
-                    cmd.CommandText = "insert into EC_client_user (CUsername,pwd,emaillist,mobileList,soldtoid) values (@CUsername,@pwd,@emaillist,@mobileList,@soldtoid)"
-                Else
-                    cmd.CommandText = "update EC_client_user set CUsername=@CUsername,pwd=@pwd,emaillist=@emaillist,mobileList=@mobileList,soldtoid=@soldtoid where cuserid=@id"
-                End If
-                cmd.Parameters.AddWithValue("@CUsername", cname)
-                cmd.Parameters.AddWithValue("@pwd", cpwd)
-                cmd.Parameters.AddWithValue("@emaillist", email)
-                cmd.Parameters.AddWithValue("@mobileList", mobile)
-                cmd.Parameters.AddWithValue("@soldtoid", soldto)
-                cmd.Parameters.AddWithValue("@id", id)
-
-
-                If cmd.ExecuteNonQuery() > 0 Then
-                    json = "1"
-                Else
-                    json = "0"
-                End If
+                parameters.Add("@id", id)
+                query = "UPDATE EC_client_user SET CUsername = @username, pwd = @password, " &
+                       "emaillist = @email, mobileList = @mobile, soldtoid = @soldto, " &
+                       "modified_date = GETDATE() WHERE cuserid = @id"
             End If
-
-
-
-
+            
+            Dim rowsAffected As Integer = DatabaseHelper.ExecuteNonQuery(query, parameters)
+            
+            If rowsAffected > 0 Then
+                SecurityHelper.LogSecurityEvent("CLIENT_MANAGEMENT", $"Client {username} {If(id = "0", "created", "updated")}")
+                Return "1" ' Success
+            Else
+                Return "0" ' Failed
+            End If
+            
         Catch ex As Exception
-        Finally
-            If conn.State = ConnectionState.Open Then
-                conn.Close()
-            End If
+            SecurityHelper.LogError("ProcessSecureClientUpdate failed", ex, Server)
+            Return "0" ' Error
         End Try
+    End Function
 
+    ' SECURITY FIX: Enhanced input validation
+    Private Function ValidateInput(input As String, inputType As String) As String
+        If String.IsNullOrWhiteSpace(input) Then
+            Return ""
+        End If
 
-        Return json
+        input = SecurityHelper.SanitizeForHtml(input.Trim())
+        
+        Select Case inputType.ToLower()
+            Case "operation"
+                If Not Regex.IsMatch(input, "^[0-9]$") Then
+                    Return ""
+                End If
+                
+            Case "id"
+                If Not Regex.IsMatch(input, "^[0-9]+$") Then
+                    Return ""
+                End If
+                
+            Case "username"
+                If input.Length > 50 OrElse Not Regex.IsMatch(input, "^[a-zA-Z0-9_@.-]+$") Then
+                    Return ""
+                End If
+                
+            Case "password"
+                If input.Length < 8 OrElse input.Length > 100 Then
+                    Return ""
+                End If
+                
+            Case "email"
+                If Not Regex.IsMatch(input, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$") Then
+                    Return ""
+                End If
+                
+            Case "mobile"
+                If Not Regex.IsMatch(input, "^[0-9+\-\s()]+$") Then
+                    Return ""
+                End If
+                
+            Case "soldto"
+                If Not Regex.IsMatch(input, "^[0-9]+$") Then
+                    Return ""
+                End If
+        End Select
+        
+        Return input
     End Function
 End Class

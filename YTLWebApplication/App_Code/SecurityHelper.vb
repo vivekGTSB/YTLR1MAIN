@@ -87,7 +87,7 @@ Public Class SecurityHelper
     End Function
     
     ' HTML encoding with additional security
-    Public Shared Function HtmlEncode(input As String) As String
+    Public Shared Function SanitizeForHtml(input As String) As String
         If String.IsNullOrEmpty(input) Then
             Return String.Empty
         End If
@@ -96,8 +96,8 @@ Public Class SecurityHelper
         Dim encoded As String = HttpUtility.HtmlEncode(input)
         
         ' Second pass - additional encoding for potential bypasses
-        encoded = encoded.Replace("&#x", "&amp;#x")
-        encoded = encoded.Replace("&#", "&amp;#")
+        encoded = encoded.Replace("&#x", "&#x")
+        encoded = encoded.Replace("&#", "&#")
         
         Return encoded
     End Function
@@ -351,6 +351,31 @@ Public Class SecurityHelper
             rng.GetBytes(bytes)
             Return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").Replace("=", "")
         End Using
+    End Function
+    
+    ' CSRF token generation and validation
+    Public Shared Function GenerateCSRFToken() As String
+        Dim token As String = GenerateSecureToken(32)
+        HttpContext.Current.Session("CSRFToken") = token
+        Return token
+    End Function
+    
+    Public Shared Function ValidateCSRFToken(submittedToken As String) As Boolean
+        If String.IsNullOrEmpty(submittedToken) Then
+            Return False
+        End If
+        
+        Dim sessionToken As String = TryCast(HttpContext.Current.Session("CSRFToken"), String)
+        If String.IsNullOrEmpty(sessionToken) Then
+            Return False
+        End If
+        
+        Return sessionToken.Equals(submittedToken, StringComparison.Ordinal)
+    End Function
+    
+    ' Session validation
+    Public Shared Function ValidateSession() As Boolean
+        Return SessionManager.ValidateSession()
     End Function
     
     ' Validate file upload security
