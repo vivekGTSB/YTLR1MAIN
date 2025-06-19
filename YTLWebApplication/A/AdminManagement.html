@@ -1,0 +1,320 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Admin Management</title>
+
+    <script language="javascript" type="text/javascript">  
+function gotopage(pageno)
+{
+var managementformobj=document.getElementById("managementform");
+
+switch (pageno)
+{
+    case "1":
+        managementformobj.action="DriverManagement.aspx";
+        break;
+    case "2":
+        managementformobj.action="FuelManagement.aspx";
+        break;
+    case "3":
+        managementformobj.action="GeofenceManagement.aspx";
+        break;
+    case "4":
+        managementformobj.action="GroupManagement.aspx";
+        break;
+    case "5":
+        managementformobj.action="MapSettingsManagement.aspx";
+        break;
+    case "6":
+        managementformobj.action="OperatorManagement.aspx";
+        break;
+    case "7":
+        managementformobj.action="PrivatePOIManagement.aspx";
+        break;
+    case "8":
+        managementformobj.action="AdminPublicPOIManagement.aspx";
+        break;
+    case "9":
+        managementformobj.action="SendSMS.aspx";
+        break;
+    case "10":
+        managementformobj.action="ServicingManagement.aspx";
+        break;
+    case "11":
+        managementformobj.action="SuperUserManagement.aspx";
+        break;
+    case "12":
+        managementformobj.action="TollFareManagement.aspx";
+        break;
+    case "13":
+        managementformobj.action="UnapprovedPublicPOIManagement.aspx";
+        break;
+    case "14":
+        managementformobj.action="UnitManagement.aspx";
+        break;
+    case "15":
+        managementformobj.action="UserManagement.aspx";
+        break;
+    case "16":
+        managementformobj.action="DocumentsDateManagement.aspx";
+        break;
+    case "17":
+        managementformobj.action="VehicleManagement.aspx";
+        break;     
+     case "19":
+        managementformobj.action="fuelformulamanagement.aspx";
+        break;
+     case "21":
+        managementformobj.action="TankProfileGenerator.aspx";
+        break;
+     case "22":
+        managementformobj.action="AddTankProfile.aspx";
+        break;
+     case "23":
+        managementformobj.action="TankProfileGenerator1.aspx";
+        break;
+	case "24":
+	    managementformobj.action="EditPanicDispatch.aspx";
+        break;
+	case "25":
+	    managementformobj.action="panichist.aspx";
+        break;
+	case "26":
+	    managementformobj.action="panic.aspx";
+        break;
+	case "27":
+	    managementformobj.action="updateplateno.aspx";
+        break;
+    case "28":
+	    managementformobj.action="AddRefuelReportSummary.aspx";
+        break;
+    case "29":
+	    managementformobj.action="updateplateno3.aspx";
+        break;
+    case "30":
+	    managementformobj.action="VehicleJumpingGPSAV.aspx";
+        break;
+    case "31":
+	    managementformobj.action="SmartFleetSMS.aspx";
+        break;
+    case "32":
+	managementformobj.action="VehicleLogSMSReport.aspx";
+        break;
+    case "33":
+	managementformobj.action="SMSincomingReport.aspx";
+        break;
+    case "34":
+	managementformobj.action="PanicModuleManagement.html";
+        break;
+    case "35":
+	managementformobj.action="InstantAlertSettingsManagement.aspx";
+        break;
+    case "36":
+	managementformobj.action="SMSPollingManagement.aspx";
+        break;
+    case "37":
+	managementformobj.action="VehicleAverageIdlingSetting.aspx";
+        break;
+    case "38":
+	managementformobj.action="VehicleIncidentManagement.aspx";
+        break;
+    case "39":
+	managementformobj.action="VehicleGeofenceManagement.aspx";
+        break;
+    case "40":
+	managementformobj.action="RefuelCompareReport.aspx";
+        break;
+    case "41":
+	managementformobj.action="PanicButtonList.aspx";
+        break;
+   case "42":
+	managementformobj.action="HistoryReport.aspx";
+        break ;
+    case "43":
+	managementformobj.action="RefuelAnalysisReportChart.aspx";
+	break;
+	 case "44":
+	managementformobj.action="IdlingInterval.aspx";
+	break;
+ case "45":
+	managementformobj.action="VehicleRoadGeofenceManagement.aspx";
+	break;
+ case "46":
+	managementformobj.action="CpDispatchList.aspx";
+	break;
+ case "47":
+	managementformobj.action="PanicButtonSentReport.aspx";
+	break;
+ case "48":
+	managementformobj.action="FuelReceipt.aspx";
+	break;
+case "49":
+	managementformobj.action="uploadFuelExcel.aspx";
+	break;
+case "50":
+	managementformobj.action="SmsOutboxReport.aspx";
+	break;
+case "51":
+	managementformobj.action="TripHourSetting.aspx";
+	break;	
+case "52":
+	managementformobj.action="UpdatePlateNoManagement.aspx";
+	break;
+	case "53":
+        managementformobj.action="GeofencePublicManagement.aspx";
+        break;
+case "54":
+        managementformobj.action="OhsasVehicleDaily.aspx";
+        break;
+case "55":
+        managementformobj.action="OhsasVehicleMonthly.aspx";
+        break;
+
+case "56":
+        managementformobj.action="calculatvehicledelay2.aspx";
+        break;
+
+case "57":
+        managementformobj.action="OVMonthlyAll.aspx";
+        break;
+        
+        case "58":
+        managementformobj.action="UploadPolygonGeofence.aspx";
+        break;
+        
+    default:
+        alert("Please select one utility.");
+        managementformobj.action="AdminManagement.html";
+}
+managementformobj.submit();
+}
+    </script>
+
+</head>
+<body style="margin: 0px;">
+    <form id="managementform" method="get" action="">
+    </form>
+    <form id="form" method="get" action="AdminManagement.html">
+        <center>
+            <div>
+                <br />
+                <img alt="Admin Management" src="images/AdminMgmt.jpg" />
+                <br />
+                <br />
+                <table>
+                    <tr>
+                        <td align="center">
+                            <table style="font-family: Verdana; font-size: 11px;">
+                                <tr>
+                                    <td style="height: 20px; background-color: #465ae8;" align="left">
+                                        <b style="color: White;">&nbsp;Admin Management Utilities :</b></td>
+                                </tr>
+                                <tr>
+                                    <td style="width: 500px; border: solid 1px #3952F9;">
+                                        <table style="width: 500px;">
+                                            <tr>
+                                                <td colspan="3">
+                                                    <br />
+                                                    <br />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td align="left">
+                                                    <b style="color: #5f7afc;">Select Page</b>
+                                                </td>
+                                                <td>
+                                                    <b style="color: #5f7afc;">:</b></td>
+                                                <td align="left">
+                                                    <select id="ddlutility" name="ddlutility" onchange="javscript:gotopage(this.value);"
+                                                        style="width: 380px;">
+                                                        <option>please choose one of the following item..</option>
+                                                        <optgroup label="User Management" style="FONT-FAMILY: Verdana;FONT-SIZE: 12px;FONT-WEIGHT: bold;">
+                                                            <option value="4">- Group Management</option>
+                                                            <option value="6">- Operator Management</option>
+                                                            <option value="11">- Super User Management</option>
+                                                            <option value="15">- User Management</option>
+                                                        </optgroup>
+                                                        <optgroup label="Vehicle Management" style="FONT-FAMILY: Verdana;FONT-SIZE: 12px;FONT-WEIGHT: bold;">
+                                                            <option value="1">- Driver Management</option>
+                                                            <option value="2">- Fuel Management</option>
+                                                            <option value="10">- Servicing Management</option>
+                                                            <option value="12">- Toll Fare Management</option>
+                                                            <option value="14">- Unit Management</option>
+                                                            <option value="16">- Vehicle Documents Date Management</option>
+                                                            <option value="38">- Vehicle Incident Management</option>
+                                                            <option value="17">- Vehicle Management</option>
+                                                        </optgroup>
+                                                        <optgroup label="Fuel Tank Management" style="FONT-FAMILY: Verdana;FONT-SIZE: 12px;FONT-WEIGHT: bold;">
+                                                            <option value="22">- Add Tank Profile Generator</option>
+                                                            <option value="19">- Fuel Formula Management</option>
+                                                            <option value="43">- Refuel Analysis Report & Chart</option>
+                                                            <option value="40">- Refuel Comparison Management</option>
+                                                            <option value="37">- Vehicle Average Idling Management</option>
+                                                        </optgroup>
+                                                        <optgroup label="Maps & POI Management" style="FONT-FAMILY: Verdana;FONT-SIZE: 12px;FONT-WEIGHT: bold;">
+                                                            <option value="58">- Upload Polygon Geofence(Excel)</option>
+                                                            <option value="3">- Geofence Management</option>
+                                                            <option value="53">- Public Geofence Management</option>
+                                                            <option value="39">- Vehicle Geofence Management</option>
+`			                                                <option value="45">- Vehicle Road Geofence Management</option> 
+                                                            <option value="5">- Map Settings Management</option>
+                                                            <option value="7">- Private POI Management</option>
+                                                            <option value="8">- Public POI Management</option>
+                                                            <option value="13">- Unapproved Public POIs Management</option>
+                                                        </optgroup>
+			                                            <optgroup label="Panic Button Management" style="FONT-FAMILY: Verdana;FONT-SIZE: 12px;FONT-WEIGHT: bold;">
+                                                            <option value="41">- Panic Button Dispatch List</option>
+                                                            <option value="24">- Panic Button Management</option>
+                                                            <option value="47">- Panic Button Sent Report</option>	
+	  		                                                <option value="25">- Panic Report</option>
+                                                        </optgroup>
+                                                        <optgroup label="Upload Excel Management (SHELL)" style="FONT-FAMILY: Verdana;FONT-SIZE: 12px;FONT-WEIGHT: bold;">
+                                                            <option value="49">- Upload Excel</option>
+                                                            <option value="48">- Edit/Delete Record</option>
+                                                        </optgroup>
+                                                        <optgroup label="OHSAS" style="FONT-FAMILY: Verdana;FONT-SIZE: 12px;FONT-WEIGHT: bold;">
+                                                            <option value="54">- OHSAS Vehicles Daily Report</option>
+                                                            <option value="55">- OHSAS Vehicles Monthly Report</option>
+	                                                    <option value="57">- OHSAS Vehicles Summary Report(Monthly)</option>
+                                                        </optgroup>
+                                                        <optgroup label="Others" style="FONT-FAMILY: Verdana;FONT-SIZE: 12px;FONT-WEIGHT: bold;">
+                                                            <option value="46">- CP SMS Dispatch List Management</option>
+                                                            <option value="35">- Instant Alert Setting Management</option>
+                                                            <option value="9">- Send SMS To Celcom Mobiles</option>
+                                                            <option value="36">- SMS Polling Management (Modem/ShortCode)</option>
+                                                            <option value="50">- SMS Outbox Report</option>
+                                                            <option value="42">- Update Vehicle History Report</option>
+                                                            <option value="30">- Update Jumping Point (GPS_AV)</option>
+                                                            <option value="27">- Update Vehicle Plate No</option>
+                                                            <option value="29">- Update Vehicle Plate No (Fuel)</option>
+			                                                <option value="52">- Update Vehicle Plate No (Fuel)(NEW)</option>
+                                                            <option value="44">- Vehicle Idling Setting Management</option>
+                                                             <option value="51">- Vehicle Trip Hour</option>
+                                                        <option value="56">- Calculate Vehicle Delay</option>
+                                                        </optgroup>	
+ 
+                                                      				                            
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td colspan="3">
+                                                    <br />
+                                                    <br />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin-bottom: 15px; font-family: Verdana; font-size: 11px; color: #5373a2;">
+                                Copyright © 2013 Global Telematics Sdn Bhd. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </center>
+    </form>
+</body>
+</html>
