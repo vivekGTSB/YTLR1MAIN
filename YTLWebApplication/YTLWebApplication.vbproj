@@ -305,6 +305,16 @@
       <DependentUpon>AlertNewL1.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
+    <Content Include="App_Code\AuditLogger.vb" />
+    <Content Include="App_Code\AuthenticationHelper.vb" />
+    <Content Include="App_Code\DatabaseHelper.vb" />
+    <Content Include="App_Code\FileUploadHelper.vb" />
+    <Content Include="App_Code\PasswordHelper.vb" />
+    <Content Include="App_Code\SecurePageBase.vb" />
+    <Content Include="App_Code\SecurityHelper.vb" />
+    <Content Include="App_Code\SecurityModule.vb" />
+    <Content Include="App_Code\SessionManager.vb" />
+    <Content Include="App_Code\VulnerabilityScanner.vb" />
     <Compile Include="buildcongeos.aspx.designer.vb">
       <DependentUpon>buildcongeos.aspx</DependentUpon>
     </Compile>
