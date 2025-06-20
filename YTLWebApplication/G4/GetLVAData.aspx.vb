@@ -1,4 +1,4 @@
-﻿Imports System.Data
+Imports System.Data
 Imports System.Data.SqlClient
 Imports Newtonsoft.Json
 
@@ -6,295 +6,432 @@ Partial Class GetLVAData
     Inherits System.Web.UI.Page
 
     Protected Sub Page_Load(ByVal sender As Object, ByVal e As System.EventArgs) Handles Me.Load
-        Dim oper As String = Request.QueryString("opr")
+        Try
+            ' SECURITY FIX: Validate authentication
+            If Not SecurityHelper.ValidateUserSession(Request, Session) Then
+                Response.Redirect("~/Login.aspx")
+                Return
+            End If
 
-        Select Case oper.ToUpper()
-            Case "0"
-                GetData()
-            Case "1"
-                InsertData()
-            Case "2"
-                UpdateData()
-            Case "3"
-                DeleteData()
-            Case "4"
-                MultiInsert()
-            Case "5"
-                MultiInsertALL()
-        End Select
+            ' SECURITY FIX: Validate and sanitize operation parameter
+            Dim oper As String = SecurityHelper.SanitizeForHtml(Request.QueryString("opr"))
+            If String.IsNullOrEmpty(oper) OrElse Not SecurityHelper.ValidateInput(oper, 1, "^[0-5]$") Then
+                Response.StatusCode = 400
+                Response.Write("Invalid operation")
+                Return
+            End If
 
+            Select Case oper.ToUpper()
+                Case "0"
+                    GetData()
+                Case "1"
+                    InsertData()
+                Case "2"
+                    UpdateData()
+                Case "3"
+                    DeleteData()
+                Case "4"
+                    MultiInsert()
+                Case "5"
+                    MultiInsertALL()
+                Case Else
+                    Response.StatusCode = 400
+                    Response.Write("Invalid operation")
+            End Select
+
+        Catch ex As Exception
+            SecurityHelper.LogError("GetLVAData Page_Load error", ex, Server)
+            Response.StatusCode = 500
+            Response.Write("An error occurred")
+        End Try
     End Sub
 
     Private Sub GetData()
-        Dim aa As New ArrayList()
-        Dim a As ArrayList
-        Dim sUserid As String = Request.QueryString("suid")
-        Dim userid As String = Request.Cookies("userinfo")("userid")
-        Dim role As String = Request.Cookies("userinfo")("role")
-        Dim userslist As String = Request.Cookies("userinfo")("userslist")
-        Dim cond As String = ""
-
-
-        If sUserid = "ALL" Then
-            If role = "User" Then
-                cond = " where userid ='" & userid & "'"
-            ElseIf role = "SuperUser" Or role = "Operator" Then
-                cond = " where userid in( " & userslist & ")"
-            End If
-        Else
-            cond = " where userid ='" & sUserid & "'"
-        End If
-
-
-
-        Dim sqlstr As String = "select gt.plateno,at.id,at.emaillist,at.mobileno from (select plateno from vehicleTBL " & cond & ") as gt left outer join  void_alert_settings at on at.plateno=gt.plateno"
-        Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-        Dim cmd As SqlCommand = New SqlCommand(sqlstr, conn)
-        Dim dr As SqlDataReader
         Try
-            Dim c As Integer = 0
-            conn.Open()
-            dr = cmd.ExecuteReader()
-            While dr.Read()
-                c += 1
-                a = New ArrayList()
+            Dim aa As New ArrayList()
+            Dim a As ArrayList
+            
+            ' SECURITY FIX: Get user data from session instead of cookies
+            Dim userid As String = SecurityHelper.ValidateAndGetUserId(Request)
+            Dim role As String = SecurityHelper.ValidateAndGetUserRole(Request)
+            Dim userslist As String = SecurityHelper.ValidateAndGetUsersList(Request)
+            
+            ' SECURITY FIX: Validate and sanitize sUserid parameter
+            Dim sUserid As String = SecurityHelper.SanitizeForHtml(Request.QueryString("suid"))
+            If Not SecurityHelper.ValidateInput(sUserid, 10, "^[A-Za-z0-9]+$") Then
+                Response.StatusCode = 400
+                Response.Write("Invalid user ID")
+                Return
+            End If
 
-                If IsDBNull(dr("id")) Then
-                    a.Add("0")
-                Else
-                    a.Add(dr("id"))
+            Dim cond As String = ""
+
+            If sUserid = "ALL" Then
+                If role = "User" Then
+                    cond = " where userid = @userid"
+                ElseIf role = "SuperUser" Or role = "Operator" Then
+                    If SecurityHelper.IsValidUsersList(userslist) Then
+                        cond = " where userid in( " & userslist & ")"
+                    Else
+                        cond = " where userid = @userid"
+                    End If
                 End If
+            Else
+                cond = " where userid = @sUserid"
+            End If
 
-                a.Add(c)
+            ' SECURITY FIX: Use parameterized query
+            Dim sqlstr As String = "select gt.plateno,at.id,at.emaillist,at.mobileno from (select plateno from vehicleTBL " & cond & ") as gt left outer join void_alert_settings at on at.plateno=gt.plateno"
+            
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
+                Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(sqlstr, conn)
+                    ' Add parameters based on condition
+                    If sUserid = "ALL" Then
+                        If role = "User" OrElse Not SecurityHelper.IsValidUsersList(userslist) Then
+                            cmd.Parameters.AddWithValue("@userid", userid)
+                        End If
+                    Else
+                        cmd.Parameters.AddWithValue("@sUserid", sUserid)
+                    End If
 
-                a.Add(dr("plateno"))
+                    conn.Open()
+                    Using dr As SqlDataReader = cmd.ExecuteReader()
+                        Dim c As Integer = 0
+                        While dr.Read()
+                            c += 1
+                            a = New ArrayList()
 
-                If IsDBNull(dr("emaillist")) Then
-                    a.Add("")
-                Else
-                    a.Add(dr("emaillist"))
-                End If
+                            If IsDBNull(dr("id")) Then
+                                a.Add("0")
+                            Else
+                                a.Add(SecurityHelper.SanitizeForHtml(dr("id").ToString()))
+                            End If
 
-                If IsDBNull(dr("mobileno")) Then
-                    a.Add("")
-                Else
-                    a.Add(dr("mobileno"))
-                End If
+                            a.Add(c)
+                            a.Add(SecurityHelper.SanitizeForHtml(dr("plateno").ToString()))
 
-                a.Add(dr("plateno"))
+                            If IsDBNull(dr("emaillist")) Then
+                                a.Add("")
+                            Else
+                                a.Add(SecurityHelper.SanitizeForHtml(dr("emaillist").ToString()))
+                            End If
 
-                If IsDBNull(dr("id")) Then
-                    a.Add("0")
-                Else
-                    a.Add(dr("id"))
-                End If
-                aa.Add(a)
-            End While
-            dr.Close()
+                            If IsDBNull(dr("mobileno")) Then
+                                a.Add("")
+                            Else
+                                a.Add(SecurityHelper.SanitizeForHtml(dr("mobileno").ToString()))
+                            End If
+
+                            a.Add(SecurityHelper.SanitizeForHtml(dr("plateno").ToString()))
+
+                            If IsDBNull(dr("id")) Then
+                                a.Add("0")
+                            Else
+                                a.Add(SecurityHelper.SanitizeForHtml(dr("id").ToString()))
+                            End If
+                            aa.Add(a)
+                        End While
+                    End Using
+                End Using
+            End Using
+
+            Dim json As String = JsonConvert.SerializeObject(aa, Formatting.None)
+            Response.ContentType = "application/json"
+            Response.Write(json)
+
         Catch ex As Exception
-
-        Finally
-            conn.Close()
+            SecurityHelper.LogError("GetData error", ex, Server)
+            Response.StatusCode = 500
+            Response.Write("An error occurred")
         End Try
-        Dim json As String = ""
-        Dim jss As New Newtonsoft.Json.JsonSerializer()
-        json = JsonConvert.SerializeObject(aa, Formatting.None)
-        Response.ContentType = "text/plain"
-        Response.Write(json)
     End Sub
 
     Private Sub InsertData()
-        Dim res As String = "0"
         Try
-            Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-            Dim plateno As String = Request.QueryString("geoid")
-            Dim email As String = Request.QueryString("eml")
+            ' SECURITY FIX: Validate and sanitize input parameters
+            Dim plateno As String = SecurityHelper.SanitizeForHtml(Request.QueryString("geoid"))
+            Dim email As String = SecurityHelper.SanitizeForHtml(Request.QueryString("eml"))
+            Dim mob As String = SecurityHelper.SanitizeForHtml(Request.QueryString("mob"))
 
-            Dim mob As String = Request.QueryString("mob")
-            Dim cmd As New SqlCommand("insert into void_alert_settings (plateno,emaillist,mobileno,updateddatetime) values ('" & plateno & "','" & email & "','" & mob & "','" & Now.ToString("yyyy/MM/dd HH:mm:ss") & "')", conn)
-            Try
-                conn.Open()
-                res = cmd.ExecuteNonQuery().ToString()
+            ' SECURITY FIX: Validate input
+            If Not SecurityHelper.ValidatePlateNumber(plateno) Then
+                Response.Write("Invalid plate number")
+                Return
+            End If
 
-            Catch ex As Exception
-                res = ex.Message
-            Finally
-                conn.Close()
-            End Try
+            If Not String.IsNullOrEmpty(email) AndAlso Not SecurityHelper.ValidateInput(email, 100, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$") Then
+                Response.Write("Invalid email format")
+                Return
+            End If
+
+            If Not String.IsNullOrEmpty(mob) AndAlso Not SecurityHelper.ValidateInput(mob, 20, "^[0-9+\-\s()]+$") Then
+                Response.Write("Invalid mobile number")
+                Return
+            End If
+
+            Dim res As String = "0"
+            
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
+                ' SECURITY FIX: Use parameterized query
+                Dim query As String = "INSERT INTO void_alert_settings (plateno,emaillist,mobileno,updateddatetime) VALUES (@plateno,@email,@mob,@datetime)"
+                Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@plateno", plateno)
+                    cmd.Parameters.AddWithValue("@email", email)
+                    cmd.Parameters.AddWithValue("@mob", mob)
+                    cmd.Parameters.AddWithValue("@datetime", DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))
+
+                    conn.Open()
+                    res = cmd.ExecuteNonQuery().ToString()
+                End Using
+            End Using
+
+            Response.ContentType = "text/plain"
+            Response.Write(res)
+
         Catch ex As Exception
-            res = ex.Message
+            SecurityHelper.LogError("InsertData error", ex, Server)
+            Response.Write("Error occurred")
         End Try
-
-        Response.ContentType = "text/plain"
-        Response.Write(res)
     End Sub
 
     Private Sub MultiInsert()
-        Dim res As String = "0"
         Try
-            Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-            Dim platenos() As String = Request.QueryString("geoid").Split(",")
-            Dim email As String = Request.QueryString("eml")
-            Dim mob As String = Request.QueryString("mob")
-            Dim plateno As String = ""
+            ' SECURITY FIX: Validate and sanitize input
+            Dim geoidParam As String = SecurityHelper.SanitizeForHtml(Request.QueryString("geoid"))
+            Dim email As String = SecurityHelper.SanitizeForHtml(Request.QueryString("eml"))
+            Dim mob As String = SecurityHelper.SanitizeForHtml(Request.QueryString("mob"))
 
-            For i As Integer = 0 To platenos.Length - 1
-                plateno = plateno & "'" & platenos(i) & "',"
-            Next
-
-            If plateno.Length > 0 Then
-                plateno = plateno.Substring(0, plateno.Length - 1)
+            If String.IsNullOrEmpty(geoidParam) Then
+                Response.Write("Invalid input")
+                Return
             End If
 
+            Dim platenos() As String = geoidParam.Split(","c)
+            Dim validPlateNumbers As New List(Of String)
 
-            Dim cmd As New SqlCommand("delete from  void_alert_settings where plateno in (" & plateno & ")", conn)
-
-            Try
-                conn.Open()
-                res = cmd.ExecuteNonQuery().ToString()
-            Catch ex As Exception
-
-            Finally
-                conn.Close()
-            End Try
-
-            For i As Integer = 0 To platenos.Length - 1
-                cmd = New SqlCommand("insert into void_alert_settings (plateno,emaillist,mobileno,updateddatetime) values ('" & platenos(i) & "','" & email & "','" & mob & "','" & Now.ToString("yyyy/MM/dd HH:mm:ss") & "')", conn)
-                Try
-                    conn.Open()
-                    res = cmd.ExecuteNonQuery().ToString()
-                Catch ex As Exception
-                    res = ex.Message
-                Finally
-                    conn.Close()
-                End Try
+            ' SECURITY FIX: Validate each plate number
+            For Each plateNo As String In platenos
+                If SecurityHelper.ValidatePlateNumber(plateNo.Trim()) Then
+                    validPlateNumbers.Add(plateNo.Trim())
+                End If
             Next
 
+            If validPlateNumbers.Count = 0 Then
+                Response.Write("No valid plate numbers")
+                Return
+            End If
+
+            Dim res As String = "0"
+            
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
+                conn.Open()
+                Using transaction As SqlTransaction = conn.BeginTransaction()
+                    Try
+                        ' SECURITY FIX: Delete existing records with parameterized query
+                        For Each plateNo As String In validPlateNumbers
+                            Dim deleteQuery As String = "DELETE FROM void_alert_settings WHERE plateno = @plateno"
+                            Using deleteCmd As SqlCommand = SecurityHelper.CreateSafeCommand(deleteQuery, conn)
+                                deleteCmd.Transaction = transaction
+                                deleteCmd.Parameters.AddWithValue("@plateno", plateNo)
+                                deleteCmd.ExecuteNonQuery()
+                            End Using
+                        Next
+
+                        ' SECURITY FIX: Insert new records with parameterized query
+                        For Each plateNo As String In validPlateNumbers
+                            Dim insertQuery As String = "INSERT INTO void_alert_settings (plateno,emaillist,mobileno,updateddatetime) VALUES (@plateno,@email,@mob,@datetime)"
+                            Using insertCmd As SqlCommand = SecurityHelper.CreateSafeCommand(insertQuery, conn)
+                                insertCmd.Transaction = transaction
+                                insertCmd.Parameters.AddWithValue("@plateno", plateNo)
+                                insertCmd.Parameters.AddWithValue("@email", email)
+                                insertCmd.Parameters.AddWithValue("@mob", mob)
+                                insertCmd.Parameters.AddWithValue("@datetime", DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))
+                                res = insertCmd.ExecuteNonQuery().ToString()
+                            End Using
+                        Next
+
+                        transaction.Commit()
+                    Catch ex As Exception
+                        transaction.Rollback()
+                        Throw
+                    End Try
+                End Using
+            End Using
+
+            Response.ContentType = "text/plain"
+            Response.Write(res)
 
         Catch ex As Exception
-            res = ex.Message
+            SecurityHelper.LogError("MultiInsert error", ex, Server)
+            Response.Write("Error occurred")
         End Try
-
-        Response.ContentType = "text/plain"
-        Response.Write(res)
     End Sub
 
     Private Sub MultiInsertALL()
-        Dim res As String = "0"
         Try
-            Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-            Dim email As String = Request.QueryString("eml")
-            Dim mob As String = Request.QueryString("mob")
-            Dim plateno As String = ""
-            Dim ds As New DataSet
-            Dim da As New SqlDataAdapter("select plateno from vehicleTBL where userid in (select userid from userTBL where role='User')", conn)
-            da.Fill(ds)
+            ' SECURITY FIX: Validate input
+            Dim email As String = SecurityHelper.SanitizeForHtml(Request.QueryString("eml"))
+            Dim mob As String = SecurityHelper.SanitizeForHtml(Request.QueryString("mob"))
 
-            If ds.Tables(0).Rows.Count > 0 Then
-                For counter As Integer = 0 To ds.Tables(0).Rows.Count - 1
-                    plateno = plateno & " '" & ds.Tables(0).Rows(counter)("plateno").ToString() & "',"
-                Next
+            Dim res As String = "0"
+            
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
+                ' SECURITY FIX: Use parameterized query to get plate numbers
+                Dim query As String = "SELECT plateno FROM vehicleTBL WHERE userid IN (SELECT userid FROM userTBL WHERE role='User')"
+                Dim plateNumbers As New List(Of String)
+
+                Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(query, conn)
+                    conn.Open()
+                    Using dr As SqlDataReader = cmd.ExecuteReader()
+                        While dr.Read()
+                            If Not IsDBNull(dr("plateno")) Then
+                                Dim plateNo As String = dr("plateno").ToString().Trim()
+                                If SecurityHelper.ValidatePlateNumber(plateNo) Then
+                                    plateNumbers.Add(plateNo)
+                                End If
+                            End If
+                        End While
+                    End Using
+                End Using
+
+                If plateNumbers.Count > 0 Then
+                    Using transaction As SqlTransaction = conn.BeginTransaction()
+                        Try
+                            ' SECURITY FIX: Clear existing records safely
+                            Dim deleteQuery As String = "DELETE FROM void_alert_settings"
+                            Using deleteCmd As SqlCommand = SecurityHelper.CreateSafeCommand(deleteQuery, conn)
+                                deleteCmd.Transaction = transaction
+                                deleteCmd.ExecuteNonQuery()
+                            End Using
+
+                            ' SECURITY FIX: Insert new records with parameterized queries
+                            For Each plateNo As String In plateNumbers
+                                Dim insertQuery As String = "INSERT INTO void_alert_settings (plateno,emaillist,mobileno,updateddatetime) VALUES (@plateno,@email,@mob,@datetime)"
+                                Using insertCmd As SqlCommand = SecurityHelper.CreateSafeCommand(insertQuery, conn)
+                                    insertCmd.Transaction = transaction
+                                    insertCmd.Parameters.AddWithValue("@plateno", plateNo)
+                                    insertCmd.Parameters.AddWithValue("@email", email)
+                                    insertCmd.Parameters.AddWithValue("@mob", mob)
+                                    insertCmd.Parameters.AddWithValue("@datetime", DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))
+                                    res = insertCmd.ExecuteNonQuery().ToString()
+                                End Using
+                            Next
+
+                            transaction.Commit()
+                        Catch ex As Exception
+                            transaction.Rollback()
+                            Throw
+                        End Try
+                    End Using
+                End If
+            End Using
+
+            Response.ContentType = "text/plain"
+            Response.Write(res)
+
+        Catch ex As Exception
+            SecurityHelper.LogError("MultiInsertALL error", ex, Server)
+            Response.Write("Error occurred")
+        End Try
+    End Sub
+
+    Private Sub UpdateData()
+        Try
+            ' SECURITY FIX: Validate and sanitize input
+            Dim geoid As String = SecurityHelper.SanitizeForHtml(Request.QueryString("geoid"))
+            Dim email As String = SecurityHelper.SanitizeForHtml(Request.QueryString("eml"))
+            Dim mob As String = SecurityHelper.SanitizeForHtml(Request.QueryString("mob"))
+
+            ' SECURITY FIX: Validate input
+            If Not SecurityHelper.ValidateNumeric(geoid, 1, Integer.MaxValue) Then
+                Response.Write("Invalid ID")
+                Return
             End If
 
-            If plateno.Length > 0 Then
-                plateno = plateno.Substring(0, plateno.Length - 1)
-            End If
+            Dim res As String = "0"
+            
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
+                ' SECURITY FIX: Use parameterized query
+                Dim query As String = "UPDATE void_alert_settings SET emaillist=@email, mobileno=@mob, updateddatetime=@datetime WHERE id=@id"
+                Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@email", email)
+                    cmd.Parameters.AddWithValue("@mob", mob)
+                    cmd.Parameters.AddWithValue("@datetime", DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"))
+                    cmd.Parameters.AddWithValue("@id", Convert.ToInt32(geoid))
 
-            Dim platenos() As String = plateno.Split(",")
-
-            Dim cmd As New SqlCommand("delete from  void_alert_settings ", conn)
-
-            Try
-                conn.Open()
-                res = cmd.ExecuteNonQuery().ToString()
-            Catch ex As Exception
-                Response.Write("Here1 " & ex.Message)
-            Finally
-                conn.Close()
-            End Try
-
-            For i As Integer = 0 To platenos.Length - 1
-                cmd = New SqlCommand("insert into void_alert_settings (plateno,emaillist,mobileno,updateddatetime) values (" & platenos(i) & ",'" & email & "','" & mob & "','" & Now.ToString("yyyy/MM/dd HH:mm:ss") & "')", conn)
-                Try
                     conn.Open()
                     res = cmd.ExecuteNonQuery().ToString()
-                    ' If Convert.ToInt32(res) = 0 Then
-                    ' Response.Write("<br/>" & cmd.CommandText & "<br/>")
-                    ' End If
+                End Using
+            End Using
 
-                Catch ex As Exception
-                    Response.Write("Here2 " & ex.Message & "<br/>" & cmd.CommandText)
-                Finally
-                    conn.Close()
-                End Try
-            Next
+            Response.ContentType = "text/plain"
+            Response.Write(res)
+
         Catch ex As Exception
-            res = ex.Message
+            SecurityHelper.LogError("UpdateData error", ex, Server)
+            Response.Write("Error occurred")
         End Try
-
-        Response.ContentType = "text/plain"
-        Response.Write(res)
-    End Sub
-    Private Sub UpdateData()
-        Dim res As String = "0"
-        Try
-            Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-            Dim geoid As String = Request.QueryString("geoid")
-            Dim email As String = Request.QueryString("eml")
-
-            Dim mob As String = Request.QueryString("mob")
-            Dim cmd As New SqlCommand("update void_alert_settings set emaillist='" & email & "',mobileno='" & mob & "',updateddatetime='" & Now.ToString("yyyy/MM/dd HH:mm:ss") & "' where id='" & geoid & "'", conn)
-            Try
-                conn.Open()
-                res = cmd.ExecuteNonQuery.ToString()
-
-            Catch ex As Exception
-                res = ex.Message
-            Finally
-                conn.Close()
-            End Try
-        Catch ex As Exception
-            res = ex.Message
-        End Try
-
-        Response.ContentType = "text/plain"
-        Response.Write(res)
     End Sub
 
     Private Sub DeleteData()
         Try
-            Dim chekitems As String = Request.QueryString("geoid")
-            Dim result As Integer
+            ' SECURITY FIX: Validate and sanitize input
+            Dim chekitems As String = SecurityHelper.SanitizeForHtml(Request.QueryString("geoid"))
+            
+            If String.IsNullOrEmpty(chekitems) Then
+                Response.Write("Invalid input")
+                Return
+            End If
+
+            Dim ids As String() = chekitems.Split(","c)
+            Dim validIds As New List(Of Integer)
+
+            ' SECURITY FIX: Validate each ID
+            For Each id As String In ids
+                Dim numericId As Integer
+                If Integer.TryParse(id.Trim(), numericId) AndAlso numericId > 0 Then
+                    validIds.Add(numericId)
+                End If
+            Next
+
+            If validIds.Count = 0 Then
+                Response.Write("No valid IDs")
+                Return
+            End If
+
             Dim res As String = "0"
-            Dim ids As String() = chekitems.Split(",")
-            Dim conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-            Dim cmd As New SqlCommand("delete from void_alert_settings where id=0", conn)
-            Try
+            
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
                 conn.Open()
-                Dim cnt As Int16 = ids.Length()
-                For i As Int16 = 0 To cnt - 1
+                Using transaction As SqlTransaction = conn.BeginTransaction()
                     Try
-                        cmd = New SqlCommand("delete from void_alert_settings where id =" & ids(i).ToString(), conn)
-                        result = cmd.ExecuteNonQuery
-                        If result > 0 Then
-                            res = "1"
-                        End If
+                        For Each validId As Integer In validIds
+                            ' SECURITY FIX: Use parameterized query
+                            Dim query As String = "DELETE FROM void_alert_settings WHERE id = @id"
+                            Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(query, conn)
+                                cmd.Transaction = transaction
+                                cmd.Parameters.AddWithValue("@id", validId)
+                                Dim result As Integer = cmd.ExecuteNonQuery()
+                                If result > 0 Then
+                                    res = "1"
+                                End If
+                            End Using
+                        Next
+                        transaction.Commit()
                     Catch ex As Exception
-                        Response.Write("@@" & ex.Message)
+                        transaction.Rollback()
+                        Throw
                     End Try
-                Next
-            Catch ex As Exception
-                Response.Write("@@@" & ex.Message)
-            Finally
-                conn.Close()
-            End Try
+                End Using
+            End Using
 
             Response.ContentType = "text/plain"
             Response.Write(res)
-        Catch ex As Exception
-            Response.Write("@" & ex.Message)
-        End Try
 
+        Catch ex As Exception
+            SecurityHelper.LogError("DeleteData error", ex, Server)
+            Response.Write("Error occurred")
+        End Try
     End Sub
 
 End Class

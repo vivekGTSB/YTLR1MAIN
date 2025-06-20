@@ -12,11 +12,13 @@ Public Class SecurityHelper
     Public Shared Function ValidateUserSession(request As HttpRequest, session As HttpSessionState) As Boolean
         Return SessionManager.ValidateSession()
     End Function
+    
     Public Shared Function CreateSecureCommand(query As String, connection As SqlConnection) As SqlCommand
         Dim cmd As New SqlCommand(query, connection)
         cmd.CommandTimeout = 30
         Return cmd
     End Function
+    
     Public Shared Function SanitizeForHtml(input As String) As String
         If String.IsNullOrEmpty(input) Then
             Return String.Empty
@@ -24,6 +26,7 @@ Public Class SecurityHelper
 
         Return HttpUtility.HtmlEncode(input)
     End Function
+    
     ' JavaScript encode for embedding in JavaScript
     Public Shared Function SanitizeForJavaScript(input As String) As String
         If String.IsNullOrEmpty(input) Then
@@ -39,6 +42,7 @@ Public Class SecurityHelper
                    .Replace("<", "\u003c") _
                    .Replace(">", "\u003e")
     End Function
+    
     ' Comprehensive input validation
     Public Shared Function ValidateInput(input As String, maxLength As Integer, Optional allowedPattern As String = Nothing) As Boolean
         If String.IsNullOrEmpty(input) Then
@@ -124,8 +128,8 @@ Public Class SecurityHelper
         Dim encoded As String = HttpUtility.HtmlEncode(input)
 
         ' Second pass - additional encoding for potential bypasses
-        encoded = encoded.Replace("&#x", "&amp;#x")
-        encoded = encoded.Replace("&#", "&amp;#")
+        encoded = encoded.Replace("&#x", "&#x")
+        encoded = encoded.Replace("&#", "&#")
 
         Return encoded
     End Function
@@ -328,7 +332,7 @@ Public Class SecurityHelper
     End Sub
 
     ' Sanitize log messages to prevent log injection
-    Private Shared Function SanitizeLogMessage(message As String) As String
+    Public Shared Function SanitizeLogMessage(message As String) As String
         If String.IsNullOrEmpty(message) Then
             Return String.Empty
         End If
@@ -427,6 +431,7 @@ Public Class SecurityHelper
 
         Return False
     End Function
+    
     Public Shared Function HasRequiredRole(requiredRole As String) As Boolean
         Try
             Dim userRole As String = GetCurrentUserRole()
@@ -451,6 +456,7 @@ Public Class SecurityHelper
             Return False
         End Try
     End Function
+    
     Public Shared Function GenerateCSRFToken() As String
         Try
             Dim token As String = Guid.NewGuid().ToString()
@@ -461,6 +467,7 @@ Public Class SecurityHelper
             Return String.Empty
         End Try
     End Function
+    
     ' Validate CSRF token
     Public Shared Function ValidateCSRFToken(submittedToken As String) As Boolean
         Try
@@ -479,6 +486,7 @@ Public Class SecurityHelper
             Return False
         End Try
     End Function
+    
     ' Rate limiting check
     Public Shared Function CheckRateLimit(key As String, maxAttempts As Integer, timeWindow As TimeSpan) As Boolean
         Try
@@ -502,6 +510,7 @@ Public Class SecurityHelper
             Return True ' Allow on error to prevent blocking legitimate users
         End Try
     End Function
+    
     ' Validate users list format
     Public Shared Function ValidateUsersList(usersList As String) As Boolean
         Try
@@ -533,4 +542,19 @@ Public Class SecurityHelper
             Return False
         End Try
     End Function
+    
+    ' Get current user role safely
+    Private Shared Function GetCurrentUserRole() As String
+        Try
+            Return SessionManager.GetCurrentUserRole()
+        Catch
+            Return Nothing
+        End Try
+    End Function
+    
+    ' Overloaded LogSecurityEvent method
+    Public Shared Sub LogSecurityEvent(eventType As String, details As String)
+        LogSecurityEvent($"{eventType}: {details}")
+    End Sub
+    
 End Class

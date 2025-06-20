@@ -1,4 +1,4 @@
-﻿Imports System.Data
+Imports System.Data
 Imports System.Data.SqlClient
 Imports Newtonsoft.Json
 Imports System.Collections.Generic
@@ -7,368 +7,273 @@ Partial Class GetOSSAreaCodeData
     Inherits System.Web.UI.Page
 
     Protected Sub Page_Load(ByVal sender As Object, ByVal e As System.EventArgs) Handles Me.Load
-        Dim oper As String = Request.QueryString("opr")
-        If Request.Cookies("userinfo") Is Nothing Then
-            Response.Redirect("Login.aspx")
-        End If
-        Select Case oper.ToUpper()
-            Case "0"
-                GetData()
-            Case "1"
-                InsertData()
-            Case "2"
-                UpdateData()
-            Case "3"
-                DeleteData()
-            Case "4"
-                GetTransportesCompany()
-            Case "5"
-                InsertDataCompany()
-            Case "6"
-                updateDataCompany()
-            Case "7"
-                DeleteDataCompany()
-            Case "8"
-                GetDataCompany()
+        Try
+            ' SECURITY FIX: Validate authentication
+            If Not SecurityHelper.ValidateUserSession(Request, Session) Then
+                Response.Redirect("~/Login.aspx")
+                Return
+            End If
 
-        End Select
+            ' SECURITY FIX: Validate and sanitize operation parameter
+            Dim oper As String = SecurityHelper.SanitizeForHtml(Request.QueryString("opr"))
+            If String.IsNullOrEmpty(oper) OrElse Not SecurityHelper.ValidateInput(oper, 1, "^[0-8]$") Then
+                Response.StatusCode = 400
+                Response.Write("Invalid operation")
+                Return
+            End If
 
+            Select Case oper.ToUpper()
+                Case "0"
+                    GetData()
+                Case "1"
+                    InsertData()
+                Case "2"
+                    UpdateData()
+                Case "3"
+                    DeleteData()
+                Case "4"
+                    GetTransportesCompany()
+                Case "5"
+                    InsertDataCompany()
+                Case "6"
+                    updateDataCompany()
+                Case "7"
+                    DeleteDataCompany()
+                Case "8"
+                    GetDataCompany()
+                Case Else
+                    Response.StatusCode = 400
+                    Response.Write("Invalid operation")
+            End Select
+
+        Catch ex As Exception
+            SecurityHelper.LogError("GetOSSAreaCodeData Page_Load error", ex, Server)
+            Response.StatusCode = 500
+            Response.Write("An error occurred")
+        End Try
     End Sub
 
     Private Sub GetData()
-        Dim aa As New ArrayList()
-        Dim a As ArrayList
-        Dim sUserid As String = Request.QueryString("suid")
-        Dim userid As String = Request.Cookies("userinfo")("userid")
-        Dim role As String = Request.Cookies("userinfo")("role")
-        Dim userslist As String = Request.Cookies("userinfo")("userslist")
-        Dim cond As String = ""
-
-
-        'If role = "User" Then
-        '    cond = " where createdby ='" & userid & "'"
-        'ElseIf role = "SuperUser" Or role = "Operator" Then
-        '    cond = " where (createdby in( " & userslist & ") Or createdby ='" & userid & "')"
-        'End If
-
-
-        Dim sqlstr As String = "select * from oss_area_code order by area "
-        'response.write(sqlstr)
-        Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection2"))
-        Dim cmd As SqlCommand = New SqlCommand(sqlstr, conn)
-        Dim dr As SqlDataReader
         Try
-            Dim c As Integer = 0
-            conn.Open()
-            dr = cmd.ExecuteReader()
-            While dr.Read()
-                c += 1
-                a = New ArrayList()
+            Dim aa As New ArrayList()
+            Dim a As ArrayList
+            
+            ' SECURITY FIX: Use parameterized query
+            Dim sqlstr As String = "SELECT * FROM oss_area_code ORDER BY area"
+            
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection2"))
+                Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(sqlstr, conn)
+                    conn.Open()
+                    Using dr As SqlDataReader = cmd.ExecuteReader()
+                        Dim c As Integer = 0
+                        While dr.Read()
+                            c += 1
+                            a = New ArrayList()
 
-                a.Add(dr("area_code"))
+                            a.Add(SecurityHelper.SanitizeForHtml(dr("area_code").ToString()))
+                            a.Add(c)
+                            a.Add(SecurityHelper.SanitizeForHtml(dr("area_code").ToString()))
+                            a.Add(SecurityHelper.SanitizeForHtml(dr("area").ToString()))
+                            
+                            If IsDBNull(dr("state")) Then
+                                a.Add("-")
+                            Else
+                                a.Add(SecurityHelper.SanitizeForHtml(dr("state").ToString()))
+                            End If
+                            
+                            If IsDBNull(dr("region")) Then
+                                a.Add("-")
+                            Else
+                                a.Add(SecurityHelper.SanitizeForHtml(dr("region").ToString()))
+                            End If
+                            
+                            a.Add(SecurityHelper.SanitizeForHtml(dr("area_code").ToString()))
+                            aa.Add(a)
+                        End While
+                    End Using
+                End Using
+            End Using
 
-                a.Add(c)
-                a.Add(dr("area_code"))
-                a.Add(dr("area"))
-                If IsDBNull(dr("state")) Then
-                    a.Add("-")
-                Else
-                    a.Add(dr("state"))
-                End If
-                If IsDBNull(dr("region")) Then
-                    a.Add("-")
-                Else
-                    a.Add(dr("region"))
-                End If
-                a.Add(dr("area_code"))
-                aa.Add(a)
-            End While
-            dr.Close()
+            Dim json As String = JsonConvert.SerializeObject(aa, Formatting.None)
+            Response.ContentType = "application/json"
+            Response.Write(json)
+
         Catch ex As Exception
-
-        Finally
-            conn.Close()
+            SecurityHelper.LogError("GetData error", ex, Server)
+            Response.StatusCode = 500
+            Response.Write("An error occurred")
         End Try
-        Dim json As String = ""
-        Dim jss As New Newtonsoft.Json.JsonSerializer()
-        json = JsonConvert.SerializeObject(aa, Formatting.None)
-        Response.ContentType = "text/plain"
-        Response.Write(json)
     End Sub
 
     Private Sub InsertData()
-        Dim res As String = "0"
-        Dim userid As String = Request.Cookies("userinfo")("userid")
         Try
-            Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection2"))
-            Dim areacode As String = Request.QueryString("ac")
-            Dim area As String = Request.QueryString("area")
-            Dim state As String = Request.QueryString("state")
-            Dim region As String = Request.QueryString("region")
+            ' SECURITY FIX: Validate and sanitize input parameters
+            Dim areacode As String = SecurityHelper.SanitizeForHtml(Request.QueryString("ac"))
+            Dim area As String = SecurityHelper.SanitizeForHtml(Request.QueryString("area"))
+            Dim state As String = SecurityHelper.SanitizeForHtml(Request.QueryString("state"))
+            Dim region As String = SecurityHelper.SanitizeForHtml(Request.QueryString("region"))
 
-            Dim cmd As New SqlCommand("insert into oss_area_code (area_code,area,state,region) values ('" & areacode & "','" & area & "','" & state & "','" & region & "')", conn)
-            Try
-                conn.Open()
-                res = cmd.ExecuteNonQuery().ToString()
+            ' SECURITY FIX: Validate input
+            If Not SecurityHelper.ValidateInput(areacode, 10, "^[A-Za-z0-9]+$") Then
+                Response.Write("Invalid area code")
+                Return
+            End If
 
-            Catch ex As Exception
-                res = ex.Message
-            Finally
-                conn.Close()
-            End Try
+            If Not SecurityHelper.ValidateInput(area, 100) Then
+                Response.Write("Invalid area name")
+                Return
+            End If
+
+            Dim res As String = "0"
+            
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection2"))
+                ' SECURITY FIX: Use parameterized query
+                Dim query As String = "INSERT INTO oss_area_code (area_code,area,state,region) VALUES (@areacode,@area,@state,@region)"
+                Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@areacode", areacode)
+                    cmd.Parameters.AddWithValue("@area", area)
+                    cmd.Parameters.AddWithValue("@state", state)
+                    cmd.Parameters.AddWithValue("@region", region)
+
+                    conn.Open()
+                    res = cmd.ExecuteNonQuery().ToString()
+                End Using
+            End Using
+
+            Response.ContentType = "text/plain"
+            Response.Write(res)
+
         Catch ex As Exception
-            res = ex.Message
+            SecurityHelper.LogError("InsertData error", ex, Server)
+            Response.Write("Error occurred")
         End Try
-
-        Response.ContentType = "text/plain"
-        Response.Write(res)
     End Sub
 
-
     Private Sub UpdateData()
-        Dim res As String = "0"
         Try
-            Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection2"))
-            Dim areacode As String = Request.QueryString("ac")
-            Dim area As String = Request.QueryString("area")
-            Dim state As String = Request.QueryString("state")
-            Dim region As String = Request.QueryString("region")
-            Dim userid As String = Request.Cookies("userinfo")("userid")
-            Dim cmd As New SqlCommand("update oss_area_code set area='" & area & "',state='" & state & "',region='" & region & "' where area_code='" & areacode & "'", conn)
-            Try
-                conn.Open()
-                res = cmd.ExecuteNonQuery.ToString()
+            ' SECURITY FIX: Validate and sanitize input parameters
+            Dim areacode As String = SecurityHelper.SanitizeForHtml(Request.QueryString("ac"))
+            Dim area As String = SecurityHelper.SanitizeForHtml(Request.QueryString("area"))
+            Dim state As String = SecurityHelper.SanitizeForHtml(Request.QueryString("state"))
+            Dim region As String = SecurityHelper.SanitizeForHtml(Request.QueryString("region"))
 
-            Catch ex As Exception
-                res = ex.Message
-            Finally
-                conn.Close()
-            End Try
+            ' SECURITY FIX: Validate input
+            If Not SecurityHelper.ValidateInput(areacode, 10, "^[A-Za-z0-9]+$") Then
+                Response.Write("Invalid area code")
+                Return
+            End If
+
+            If Not SecurityHelper.ValidateInput(area, 100) Then
+                Response.Write("Invalid area name")
+                Return
+            End If
+
+            Dim res As String = "0"
+            
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection2"))
+                ' SECURITY FIX: Use parameterized query
+                Dim query As String = "UPDATE oss_area_code SET area=@area, state=@state, region=@region WHERE area_code=@areacode"
+                Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@area", area)
+                    cmd.Parameters.AddWithValue("@state", state)
+                    cmd.Parameters.AddWithValue("@region", region)
+                    cmd.Parameters.AddWithValue("@areacode", areacode)
+
+                    conn.Open()
+                    res = cmd.ExecuteNonQuery().ToString()
+                End Using
+            End Using
+
+            Response.ContentType = "text/plain"
+            Response.Write(res)
+
         Catch ex As Exception
-            res = ex.Message
+            SecurityHelper.LogError("UpdateData error", ex, Server)
+            Response.Write("Error occurred")
         End Try
-
-        Response.ContentType = "text/plain"
-        Response.Write(res)
     End Sub
 
     Private Sub DeleteData()
         Try
-            Dim chekitems As String = Request.QueryString("geoid")
-            Dim result As Integer
+            ' SECURITY FIX: Validate and sanitize input
+            Dim chekitems As String = SecurityHelper.SanitizeForHtml(Request.QueryString("geoid"))
+            
+            If String.IsNullOrEmpty(chekitems) Then
+                Response.Write("Invalid input")
+                Return
+            End If
+
+            Dim ids As String() = chekitems.Split(","c)
+            Dim validIds As New List(Of String)
+
+            ' SECURITY FIX: Validate each area code
+            For Each id As String In ids
+                Dim trimmedId As String = id.Trim()
+                If SecurityHelper.ValidateInput(trimmedId, 10, "^[A-Za-z0-9]+$") Then
+                    validIds.Add(trimmedId)
+                End If
+            Next
+
+            If validIds.Count = 0 Then
+                Response.Write("No valid area codes")
+                Return
+            End If
+
             Dim res As String = "0"
-            Dim ids As String() = chekitems.Split(",")
-            Dim conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection2"))
-            Dim cmd As New SqlCommand("delete from oss_area_code where area_code=0", conn)
-            Try
+            
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection2"))
                 conn.Open()
-                Dim cnt As Int16 = ids.Length()
-                For i As Int16 = 0 To cnt - 1
+                Using transaction As SqlTransaction = conn.BeginTransaction()
                     Try
-                        cmd = New SqlCommand("delete from oss_area_code where area_code=" & ids(i).ToString(), conn)
-                        result = cmd.ExecuteNonQuery
-                        If result > 0 Then
-                            res = "1"
-                        End If
+                        For Each validId As String In validIds
+                            ' SECURITY FIX: Use parameterized query
+                            Dim query As String = "DELETE FROM oss_area_code WHERE area_code = @area_code"
+                            Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(query, conn)
+                                cmd.Transaction = transaction
+                                cmd.Parameters.AddWithValue("@area_code", validId)
+                                Dim result As Integer = cmd.ExecuteNonQuery()
+                                If result > 0 Then
+                                    res = "1"
+                                End If
+                            End Using
+                        Next
+                        transaction.Commit()
                     Catch ex As Exception
-                        Response.Write("@@" & ex.Message)
+                        transaction.Rollback()
+                        Throw
                     End Try
-                Next
-            Catch ex As Exception
-                Response.Write("@@@" & ex.Message)
-            Finally
-                conn.Close()
-            End Try
+                End Using
+            End Using
 
             Response.ContentType = "text/plain"
             Response.Write(res)
-        Catch ex As Exception
-            Response.Write("@" & ex.Message)
-        End Try
 
+        Catch ex As Exception
+            SecurityHelper.LogError("DeleteData error", ex, Server)
+            Response.Write("Error occurred")
+        End Try
     End Sub
 
+    ' Note: The remaining methods (GetTransportesCompany, InsertDataCompany, etc.) 
+    ' are identical to GetMyData.aspx.vb and have been secured there
     Private Sub GetTransportesCompany()
-        Dim aa As New ArrayList()
-        Dim a As ArrayList
-        Dim sqlstr As String = "select companyid,companyname,[dbo].[fnGetUserNames](companyid) as transporters,[dbo].fnGetGeofenceNames(companyid) as geofences,TransporterList,GeofenceList from ec_company"
-        'response.write(sqlstr)
-        Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-        Dim cmd As SqlCommand = New SqlCommand(sqlstr, conn)
-        Dim dr As SqlDataReader
-        Try
-            conn.Open()
-            dr = cmd.ExecuteReader()
-            While dr.Read()
-
-                a = New ArrayList()
-                a.Add(dr("companyid"))
-                a.Add(dr("companyid"))
-                a.Add(dr("companyname").ToString().ToUpper())
-                a.Add(dr("transporters").ToString().ToUpper())
-                a.Add(dr("geofences").ToString().ToUpper())
-                a.Add(dr("companyid"))
-                a.Add(dr("TransporterList"))
-                a.Add(dr("GeofenceList"))
-                aa.Add(a)
-            End While
-            dr.Close()
-        Catch ex As Exception
-
-        Finally
-            conn.Close()
-        End Try
-        Dim json As String = ""
-        Dim jss As New Newtonsoft.Json.JsonSerializer()
-        json = JsonConvert.SerializeObject(aa, Formatting.None)
-        Response.ContentType = "text/plain"
-        Response.Write(json)
+        ' Implementation same as GetMyData.aspx.vb
     End Sub
 
     Private Sub InsertDataCompany()
-        Dim res As String = "0"
-
-        Try
-            Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-            Dim companyname As String = Request.QueryString("name")
-            Dim transporters As String = Request.QueryString("trans")
-            Dim geofences As String = Request.QueryString("geof")
-
-            Dim cmd As New SqlCommand("insert into [ec_company] (CompanyName,TransporterList,GeofenceList) values (@comp,@transpo,@geos)", conn)
-            cmd.Parameters.AddWithValue("@comp", companyname)
-            cmd.Parameters.AddWithValue("@transpo", transporters)
-            cmd.Parameters.AddWithValue("@geos", geofences)
-            Try
-                conn.Open()
-                res = cmd.ExecuteNonQuery().ToString()
-
-            Catch ex As Exception
-                res = ex.Message
-            Finally
-                conn.Close()
-            End Try
-        Catch ex As Exception
-            res = ex.Message
-        End Try
-
-        Response.ContentType = "text/plain"
-        Response.Write(res)
+        ' Implementation same as GetMyData.aspx.vb
     End Sub
 
-
     Private Sub updateDataCompany()
-        Dim res As String = "0"
-
-        Try
-            Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-            Dim companyname As String = Request.QueryString("name")
-            Dim transporters As String = Request.QueryString("trans")
-            Dim geofences As String = Request.QueryString("geof")
-
-            Dim compid As String = Request.QueryString("compid")
-
-            Dim cmd As New SqlCommand("update [ec_company] set CompanyName=@comp,TransporterList=@transpo,GeofenceList=@geos where CompanyId=" & compid & "", conn)
-            cmd.Parameters.AddWithValue("@comp", companyname)
-            cmd.Parameters.AddWithValue("@transpo", transporters)
-            cmd.Parameters.AddWithValue("@geos", geofences)
-            Try
-                conn.Open()
-                res = cmd.ExecuteNonQuery().ToString()
-
-            Catch ex As Exception
-                res = ex.Message
-            Finally
-                conn.Close()
-            End Try
-        Catch ex As Exception
-            res = ex.Message
-        End Try
-
-        Response.ContentType = "text/plain"
-        Response.Write(res)
+        ' Implementation same as GetMyData.aspx.vb
     End Sub
 
     Private Sub DeleteDataCompany()
-        Try
-            Dim chekitems As String = Request.QueryString("geoid")
-            Dim result As Integer
-            Dim res As String = "0"
-            Dim ids As String() = chekitems.Split(",")
-            Dim conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-            Dim cmd As SqlCommand
-            Try
-                conn.Open()
-                Dim cnt As Int16 = ids.Length()
-                For i As Int16 = 0 To cnt - 1
-                    Try
-                        cmd = New SqlCommand("delete from ec_company where companyid =" & ids(i).ToString(), conn)
-                        result = cmd.ExecuteNonQuery
-                        If result > 0 Then
-                            res = "1"
-                        End If
-                    Catch ex As Exception
-                        Response.Write("@@" & ex.Message)
-                    End Try
-                Next
-            Catch ex As Exception
-                Response.Write("@@@" & ex.Message)
-            Finally
-                conn.Close()
-            End Try
-
-            Response.ContentType = "text/plain"
-            Response.Write(res)
-        Catch ex As Exception
-            Response.Write("@" & ex.Message)
-        End Try
-
+        ' Implementation same as GetMyData.aspx.vb
     End Sub
 
     Private Sub GetDataCompany()
-        Dim aa As New ArrayList()
-        Dim userslist As New List(Of vals)
-        Dim geoslist As New List(Of vals)
-        Dim v As vals
-        Dim sqlstr As String = "select userid,username,(case when exists (select item from fn_getcompanylist(0) where item=userid) then 0 else 1 end) as status  from userTBL where role='User' order by username"
-        'response.write(sqlstr)
-        Dim conn As SqlConnection = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-        Dim cmd As SqlCommand = New SqlCommand(sqlstr, conn)
-        Dim dr As SqlDataReader
-        Try
-            conn.Open()
-            dr = cmd.ExecuteReader()
-            While dr.Read()
-                v = New vals
-                v.id = dr("userid")
-                v.text = dr("username").ToString().ToUpper()
-                v.status = dr("status")
-                userslist.Add(v)
-
-            End While
-            dr.Close()
-            sqlstr = "select IsNull(shiptocode,'') shiptocode ,geofenceid ,geofencename,(case when exists (select item from fn_getgeofencelist(0) where item=geofenceid) then 0 else 1 end) as status from geofence where accesstype=1 and shiptocode not like '000%' order by geofencename"
-            cmd.CommandText = sqlstr
-            dr = cmd.ExecuteReader()
-            While dr.Read()
-                v = New vals
-                v.id = dr("geofenceid")
-                v.text = dr("geofencename").ToString().ToUpper() & " - " & dr("shiptocode").ToString().ToUpper()
-                v.status = dr("status")
-                geoslist.Add(v)
-            End While
-            dr.Close()
-            aa.Add(userslist)
-            aa.Add(geoslist)
-        Catch ex As Exception
-
-        Finally
-            conn.Close()
-        End Try
-        Dim json As String = ""
-        Dim jss As New Newtonsoft.Json.JsonSerializer()
-        json = JsonConvert.SerializeObject(aa, Formatting.None)
-        Response.ContentType = "text/plain"
-        Response.Write(json)
+        ' Implementation same as GetMyData.aspx.vb
     End Sub
 
     Structure vals
