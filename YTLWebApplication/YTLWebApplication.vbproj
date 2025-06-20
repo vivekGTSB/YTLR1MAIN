@@ -492,6 +492,145 @@
     <Compile Include="G2\SecureGetGroups.aspx.vb">
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
+    <Compile Include="G3\GetIVMSUnitList.aspx.designer.vb">
+      <DependentUpon>GetIVMSUnitList.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G3\GetIVMSUnitList.aspx.vb">
+      <DependentUpon>GetIVMSUnitList.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G3\GetJobData.aspx.designer.vb">
+      <DependentUpon>GetJobData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G3\GetJobData.aspx.vb">
+      <DependentUpon>GetJobData.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G3\GetKPIDetailsAPK.aspx.designer.vb">
+      <DependentUpon>GetKPIDetailsAPK.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G3\GetKPIDetailsAPK.aspx.vb">
+      <DependentUpon>GetKPIDetailsAPK.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G3\GetLatest.aspx.designer.vb">
+      <DependentUpon>GetLatest.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G3\GetLatest.aspx.vb">
+      <DependentUpon>GetLatest.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G3\GetLostData.aspx.designer.vb">
+      <DependentUpon>GetLostData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G3\GetLostData.aspx.vb">
+      <DependentUpon>GetLostData.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G4\GetLVAData.aspx.designer.vb">
+      <DependentUpon>GetLVAData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G4\GetLVAData.aspx.vb">
+      <DependentUpon>GetLVAData.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G4\GetMyData.aspx.designer.vb">
+      <DependentUpon>GetMyData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G4\GetMyData.aspx.vb">
+      <DependentUpon>GetMyData.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G4\GetOSSAreaCodeData.aspx.designer.vb">
+      <DependentUpon>GetOSSAreaCodeData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G4\GetOSSAreaCodeData.aspx.vb">
+      <DependentUpon>GetOSSAreaCodeData.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G4\GetOssDash.aspx.designer.vb">
+      <DependentUpon>GetOssDash.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G4\GetOssDash.aspx.vb">
+      <DependentUpon>GetOssDash.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G4\GetOssData.aspx.designer.vb">
+      <DependentUpon>GetOssData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G4\GetOssData.aspx.vb">
+      <DependentUpon>GetOssData.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G4\GetOssDetails.aspx.designer.vb">
+      <DependentUpon>GetOssDetails.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G4\GetOssDetails.aspx.vb">
+      <DependentUpon>GetOssDetails.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G4\GetOssEta.aspx.designer.vb">
+      <DependentUpon>GetOssEta.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G4\GetOssEta.aspx.vb">
+      <DependentUpon>GetOssEta.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G4\GetOssT1.aspx.designer.vb">
+      <DependentUpon>GetOssT1.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G4\GetOssT1.aspx.vb">
+      <DependentUpon>GetOssT1.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G5\GetPlateNo.aspx.designer.vb">
+      <DependentUpon>GetPlateNo.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetPlateNo.aspx.vb">
+      <DependentUpon>GetPlateNo.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetPlates.aspx.designer.vb">
+      <DependentUpon>GetPlates.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetPlates.aspx.vb">
+      <DependentUpon>GetPlates.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetPollData.aspx.designer.vb">
+      <DependentUpon>GetPollData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetPollData.aspx.vb">
+      <DependentUpon>GetPollData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetPolygonsJson.aspx.designer.vb">
+      <DependentUpon>GetPolygonsJson.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetPolygonsJson.aspx.vb">
+      <DependentUpon>GetPolygonsJson.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetRefuelSummary.aspx.designer.vb">
+      <DependentUpon>GetRefuelSummary.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetRefuelSummary.aspx.vb">
+      <DependentUpon>GetRefuelSummary.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetServiceData.aspx.designer.vb">
+      <DependentUpon>GetServiceData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetServiceData.aspx.vb">
+      <DependentUpon>GetServiceData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetShiptoData.aspx.designer.vb">
+      <DependentUpon>GetShiptoData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetShiptoData.aspx.vb">
+      <DependentUpon>GetShiptoData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetSmartFleetApk.aspx.designer.vb">
+      <DependentUpon>GetSmartFleetApk.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G5\GetSmartFleetApk.aspx.vb">
+      <DependentUpon>GetSmartFleetApk.aspx</DependentUpon>
+    </Compile>
     <Compile Include="GetOSSAreaCodeData.aspx.designer.vb">
       <DependentUpon>GetOSSAreaCodeData.aspx</DependentUpon>
     </Compile>
@@ -3372,6 +3511,27 @@
     <Content Include="G2\GetGeofenceData.aspx" />
     <Content Include="G2\GetGeofenceGeoJson.aspx" />
     <Content Include="G2\GetGroups.aspx" />
+    <Content Include="G3\GetIVMSUnitList.aspx" />
+    <Content Include="G3\GetJobData.aspx" />
+    <Content Include="G3\GetKPIDetailsAPK.aspx" />
+    <Content Include="G3\GetLatest.aspx" />
+    <Content Include="G3\GetLostData.aspx" />
+    <Content Include="G4\GetLVAData.aspx" />
+    <Content Include="G4\GetMyData.aspx" />
+    <Content Include="G4\GetOSSAreaCodeData.aspx" />
+    <Content Include="G4\GetOssDash.aspx" />
+    <Content Include="G4\GetOssData.aspx" />
+    <Content Include="G4\GetOssDetails.aspx" />
+    <Content Include="G4\GetOssEta.aspx" />
+    <Content Include="G4\GetOssT1.aspx" />
+    <Content Include="G5\GetPlateNo.aspx" />
+    <Content Include="G5\GetPlates.aspx" />
+    <Content Include="G5\GetPollData.aspx" />
+    <Content Include="G5\GetPolygonsJson.aspx" />
+    <Content Include="G5\GetRefuelSummary.aspx" />
+    <Content Include="G5\GetServiceData.aspx" />
+    <Content Include="G5\GetShiptoData.aspx" />
+    <Content Include="G5\GetSmartFleetApk.aspx" />
     <Content Include="GetOSSAreaCodeData.aspx" />
     <Content Include="GMapQuarry.aspx" />
     <Content Include="GMap\GMapQuarry.js" />
