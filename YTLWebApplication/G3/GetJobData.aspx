@@ -1,4 +1,4 @@
-﻿<%@ Page Language="vb" AutoEventWireup="false" CodeBehind="GetJobData.aspx.vb" Inherits="YTLWebApplication.GetJobData" %>
+<%@ Page Language="vb" AutoEventWireup="false" CodeBehind="GetJobData.aspx.vb" Inherits="YTLWebApplication.GetJobData" %>
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -45,10 +45,7 @@
     <script type="text/javascript">
         var oTable;
 
-
-
         function fnFeaturesInit() {
-
             $('ul.limit_length>li').each(function (i) {
                 if (i > 10) {
                     this.style.display = 'none';
@@ -65,14 +62,22 @@
                 $('ul.limit_length li.css_link').css('display', 'none');
             });
         }
+        
         $(document).ready(function () {
             fnFeaturesInit();
+
+            // SECURITY FIX: Validate plateno before using
+            var plateno = '<%=HttpUtility.JavaScriptStringEncode(plateno)%>';
+            if (!plateno || plateno.length === 0) {
+                alert('Invalid plate number');
+                return;
+            }
 
             oTable = $('#examples').dataTable({
                 "bProcessing": false,
                 "bJQueryUI": true,
                 "bServerSide": false,
-                "sAjaxSource": "GetOssData.aspx?plateno=<%=plateno %>",
+                "sAjaxSource": "GetOssData.aspx?plateno=" + encodeURIComponent(plateno),
                 "sScrollY": "250px",
                 "bPaginate": false,
                 "bScrollCollapse": true,
@@ -99,15 +104,12 @@
                     { "sClass": "left", "sWidth": "135px", "bSortable": true, "aTargets": [7], "bVisible": true, "asSorting": ["desc", "asc"] },
                     { "sClass": "left", "sWidth": "135px", "bSortable": true, "aTargets": [8], "bVisible": true, "asSorting": ["desc", "asc"] }
                 ],
-
                 "sDom": '<"H"Cl<"MyButton">f>rt<"F"ipT>',
-
             });
-            $("div.MyButton").html('<div style=\"Color:White;font-size:13px;\">Plate No :  <%=plateno %> </div>');
-
-
+            
+            // SECURITY FIX: Encode plateno for display
+            $("div.MyButton").html('<div style=\"Color:White;font-size:13px;\">Plate No: ' + $('<div>').text(plateno).html() + '</div>');
         });
-
     </script>
 </head>
 <body id="dt_example" style="margin: 0px;">
@@ -120,48 +122,30 @@
                         <table cellpadding="0" cellspacing="0" border="0" class="display" id="examples" style="font-size: 11px; font-weight: normal; font-family: Myriad Pro,Lucida Grande,Helvetica,Arial,sans-serif">
                             <thead style="text-align: left;">
                                 <tr>
-                                    <th width="35px">S No
-                                    </th>
-                                    <th width="40px">Source
-                                    </th>
-                                    <th width="50px">Dn ID
-                                    </th>
-                                    <th width="70px">Product Type
-                                    </th>
-                                    <th width="70px">Area Info
-                                    </th>
-                                    <th width="70px">Ship to Code
-                                    </th>
-                                    <th >Ship to Name
-                                    </th>
-                                     <th width="130px">Weight Out
-                                    </th>
-                                    <th width="130px">ATA
-                                    </th>
+                                    <th width="35px">S No</th>
+                                    <th width="40px">Source</th>
+                                    <th width="50px">Dn ID</th>
+                                    <th width="70px">Product Type</th>
+                                    <th width="70px">Area Info</th>
+                                    <th width="70px">Ship to Code</th>
+                                    <th>Ship to Name</th>
+                                    <th width="130px">Weight Out</th>
+                                    <th width="130px">ATA</th>
                                 </tr>
                             </thead>
                             <tbody>
                             </tbody>
                             <tfoot style="text-align: left; font-weight: bold;">
                                 <tr>
-                                     <th width="35px">S No
-                                    </th>
-                                    <th width="40px">Source
-                                    </th>
-                                    <th width="50px">Dn ID
-                                    </th>
-                                    <th width="70px">Product Type
-                                    </th>
-                                    <th width="70px">Area Info
-                                    </th>
-                                    <th width="70px">Ship to Code
-                                    </th>
-                                    <th >Ship to Name
-                                    </th>
-                                     <th width="130px">Weight Out
-                                    </th>
-                                    <th width="130px">ATA
-                                    </th>
+                                    <th width="35px">S No</th>
+                                    <th width="40px">Source</th>
+                                    <th width="50px">Dn ID</th>
+                                    <th width="70px">Product Type</th>
+                                    <th width="70px">Area Info</th>
+                                    <th width="70px">Ship to Code</th>
+                                    <th>Ship to Name</th>
+                                    <th width="130px">Weight Out</th>
+                                    <th width="130px">ATA</th>
                                 </tr>
                             </tfoot>
                         </table>
