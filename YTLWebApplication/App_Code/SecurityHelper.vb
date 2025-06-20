@@ -12,18 +12,20 @@ Public Class SecurityHelper
     Public Shared Function ValidateUserSession(request As HttpRequest, session As HttpSessionState) As Boolean
         Return SessionManager.ValidateSession()
     End Function
+    
     Public Shared Function CreateSecureCommand(query As String, connection As SqlConnection) As SqlCommand
         Dim cmd As New SqlCommand(query, connection)
         cmd.CommandTimeout = 30
         Return cmd
     End Function
+    
     Public Shared Function SanitizeForHtml(input As String) As String
         If String.IsNullOrEmpty(input) Then
             Return String.Empty
         End If
-
         Return HttpUtility.HtmlEncode(input)
     End Function
+    
     ' JavaScript encode for embedding in JavaScript
     Public Shared Function SanitizeForJavaScript(input As String) As String
         If String.IsNullOrEmpty(input) Then
@@ -39,13 +41,10 @@ Public Class SecurityHelper
                    .Replace("<", "\u003c") _
                    .Replace(">", "\u003e")
     End Function
+    
     ' Comprehensive input validation
-    Public Shared Function ValidateInput(input As String, maxLength As Integer, Optional allowedPattern As String = Nothing) As Boolean
+    Public Shared Function ValidateInput(input As String, inputType As String) As Boolean
         If String.IsNullOrEmpty(input) Then
-            Return False
-        End If
-
-        If input.Length > maxLength Then
             Return False
         End If
 
@@ -54,14 +53,18 @@ Public Class SecurityHelper
             Return False
         End If
 
-        If Not String.IsNullOrEmpty(allowedPattern) Then
-            Dim regex As New Regex(allowedPattern)
-            If Not regex.IsMatch(input) Then
-                Return False
-            End If
-        End If
-
-        Return True
+        Select Case inputType.ToLower()
+            Case "username"
+                Return Regex.IsMatch(input, "^[A-Za-z0-9_@.-]{1,50}$")
+            Case "plateno"
+                Return Regex.IsMatch(input, "^[A-Za-z0-9\-\s]{1,20}$")
+            Case "userid"
+                Return Regex.IsMatch(input, "^[0-9]{1,10}$")
+            Case "email"
+                Return Regex.IsMatch(input, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+            Case Else
+                Return input.Length <= 100
+        End Select
     End Function
 
     ' Detect dangerous patterns including SQL injection, XSS, and command injection
@@ -99,7 +102,7 @@ Public Class SecurityHelper
 
         For Each pattern As String In dangerousPatterns
             If Regex.IsMatch(input, pattern, RegexOptions.IgnoreCase) Then
-                LogSecurityEvent($"Dangerous pattern detected: {pattern} in input: {input.Substring(0, Math.Min(50, input.Length))}")
+                LogSecurityEvent("DANGEROUS_PATTERN", $"Dangerous pattern detected: {pattern} in input: {input.Substring(0, Math.Min(50, input.Length))}")
                 Return True
             End If
         Next
@@ -124,8 +127,8 @@ Public Class SecurityHelper
         Dim encoded As String = HttpUtility.HtmlEncode(input)
 
         ' Second pass - additional encoding for potential bypasses
-        encoded = encoded.Replace("&#x", "&amp;#x")
-        encoded = encoded.Replace("&#", "&amp;#")
+        encoded = encoded.Replace("&#x", "&#x")
+        encoded = encoded.Replace("&#", "&#")
 
         Return encoded
     End Function
@@ -135,7 +138,6 @@ Public Class SecurityHelper
         If String.IsNullOrEmpty(input) Then
             Return String.Empty
         End If
-
         Return HttpUtility.UrlEncode(input)
     End Function
 
@@ -303,13 +305,18 @@ Public Class SecurityHelper
     End Sub
 
     ' Security event logging
-    Public Shared Sub LogSecurityEvent(message As String)
+    Public Shared Sub LogSecurityEvent(eventType As String, message As String, Optional userId As String = "")
         Try
             Dim sanitizedMessage As String = SanitizeLogMessage(message)
-            Dim logEntry As String = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - SECURITY: {sanitizedMessage} - IP: {HttpContext.Current.Request.UserHostAddress}"
+            Dim currentUserId As String = If(String.IsNullOrEmpty(userId), GetCurrentUserId(), userId)
+            Dim logEntry As String = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {eventType}: {sanitizedMessage} - User: {currentUserId} - IP: {GetClientIP()}"
 
             ' Log to Windows Event Log
-            System.Diagnostics.EventLog.WriteEntry("YTL_Security", logEntry, System.Diagnostics.EventLogEntryType.Warning)
+            Try
+                System.Diagnostics.EventLog.WriteEntry("YTL_Security", logEntry, System.Diagnostics.EventLogEntryType.Warning)
+            Catch
+                ' Fail silently if event log is not available
+            End Try
 
             ' Also log to file
             Dim logPath As String = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", "SecurityLog.txt")
@@ -418,15 +425,17 @@ Public Class SecurityHelper
             New Byte() {&H4D, &H5A}, ' MZ (PE executable)
             New Byte() {&H50, &H4B}, ' PK (ZIP/Office documents - could contain macros)
             New Byte() {&H7F, &H45, &H4C, &H46} ' ELF executable
-}
-        For Each Signature In dangerousSignatures
-            If fileContent.Take(Signature.Length).SequenceEqual(Signature) Then
+        }
+        
+        For Each signature In dangerousSignatures
+            If fileContent.Take(signature.Length).SequenceEqual(signature) Then
                 Return True
             End If
         Next
 
         Return False
     End Function
+    
     Public Shared Function HasRequiredRole(requiredRole As String) As Boolean
         Try
             Dim userRole As String = GetCurrentUserRole()
@@ -451,6 +460,7 @@ Public Class SecurityHelper
             Return False
         End Try
     End Function
+    
     Public Shared Function GenerateCSRFToken() As String
         Try
             Dim token As String = Guid.NewGuid().ToString()
@@ -461,6 +471,7 @@ Public Class SecurityHelper
             Return String.Empty
         End Try
     End Function
+    
     ' Validate CSRF token
     Public Shared Function ValidateCSRFToken(submittedToken As String) As Boolean
         Try
@@ -479,6 +490,7 @@ Public Class SecurityHelper
             Return False
         End Try
     End Function
+    
     ' Rate limiting check
     Public Shared Function CheckRateLimit(key As String, maxAttempts As Integer, timeWindow As TimeSpan) As Boolean
         Try
@@ -502,6 +514,7 @@ Public Class SecurityHelper
             Return True ' Allow on error to prevent blocking legitimate users
         End Try
     End Function
+    
     ' Validate users list format
     Public Shared Function ValidateUsersList(usersList As String) As Boolean
         Try
@@ -533,4 +546,80 @@ Public Class SecurityHelper
             Return False
         End Try
     End Function
+
+    ' Hash password using SHA-256
+    Public Shared Function HashPassword(password As String) As String
+        Try
+            Using sha256 As SHA256 = SHA256.Create()
+                Dim hashedBytes As Byte() = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password))
+                Return Convert.ToBase64String(hashedBytes)
+            End Using
+        Catch ex As Exception
+            LogSecurityEvent("PASSWORD_HASH_ERROR", ex.Message)
+            Throw New CryptographicException("Password hashing failed")
+        End Try
+    End Function
+
+    ' Validate session
+    Public Shared Function ValidateSession() As Boolean
+        Try
+            Dim session As HttpSessionState = HttpContext.Current.Session
+            
+            ' Check if session exists and is authenticated
+            If session("authenticated") Is Nothing OrElse Not CBool(session("authenticated")) Then
+                Return False
+            End If
+            
+            ' Check session timeout
+            If session("loginTime") IsNot Nothing Then
+                Dim loginTime As DateTime = CDate(session("loginTime"))
+                If DateTime.Now.Subtract(loginTime).TotalMinutes > 30 Then ' 30 minute timeout
+                    session.Clear()
+                    Return False
+                End If
+            End If
+            
+            Return True
+            
+        Catch ex As Exception
+            LogSecurityEvent("SESSION_VALIDATION_ERROR", ex.Message)
+            Return False
+        End Try
+    End Function
+
+    ' Get current user ID from session
+    Private Shared Function GetCurrentUserId() As String
+        Try
+            If HttpContext.Current.Session("userid") IsNot Nothing Then
+                Return HttpContext.Current.Session("userid").ToString()
+            End If
+        Catch
+        End Try
+        Return "Anonymous"
+    End Function
+
+    ' Get current user role from session
+    Private Shared Function GetCurrentUserRole() As String
+        Try
+            If HttpContext.Current.Session("role") IsNot Nothing Then
+                Return HttpContext.Current.Session("role").ToString()
+            End If
+        Catch
+        End Try
+        Return ""
+    End Function
+
+    ' Get client IP address
+    Private Shared Function GetClientIP() As String
+        Try
+            Dim ip As String = HttpContext.Current.Request.ServerVariables("HTTP_X_FORWARDED_FOR")
+            If String.IsNullOrEmpty(ip) Then
+                ip = HttpContext.Current.Request.ServerVariables("REMOTE_ADDR")
+            End If
+            Return ip
+        Catch
+            Return "Unknown"
+        End Try
+    End Function
+
 End Class
