@@ -310,7 +310,9 @@
     <Content Include="App_Code\DatabaseHelper.vb" />
     <Content Include="App_Code\FileUploadHelper.vb" />
     <Content Include="App_Code\PasswordHelper.vb" />
-    <Content Include="App_Code\SecurePageBase.vb" />
+    <Content Include="App_Code\SecurePageBase.vb">
+      <SubType>ASPXCodeBehind</SubType>
+    </Content>
     <Content Include="App_Code\SecurityHelper.vb" />
     <Content Include="App_Code\SecurityModule.vb" />
     <Content Include="App_Code\SessionManager.vb" />
@@ -369,6 +371,125 @@
     </Compile>
     <Compile Include="DriverRoleAssignManagement.aspx.vb">
       <DependentUpon>DriverRoleAssignManagement.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G1\GetAlertInbox.aspx.designer.vb">
+      <DependentUpon>GetAlertInbox.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetAlertInbox.aspx.vb">
+      <DependentUpon>GetAlertInbox.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetChartData.aspx.designer.vb">
+      <DependentUpon>GetChartData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetChartData.aspx.vb">
+      <DependentUpon>GetChartData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetChartVehicle.aspx.designer.vb">
+      <DependentUpon>GetChartVehicle.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetChartVehicle.aspx.vb">
+      <DependentUpon>GetChartVehicle.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetCirclesJson.aspx.designer.vb">
+      <DependentUpon>GetCirclesJson.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetCirclesJson.aspx.vb">
+      <DependentUpon>GetCirclesJson.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetClientDashData.aspx.designer.vb">
+      <DependentUpon>GetClientDashData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetClientDashData.aspx.vb">
+      <DependentUpon>GetClientDashData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetClientSoldToManagement.aspx.designer.vb">
+      <DependentUpon>GetClientSoldToManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetClientSoldToManagement.aspx.vb">
+      <DependentUpon>GetClientSoldToManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetDMS.aspx.designer.vb">
+      <DependentUpon>GetDMS.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\GetDMS.aspx.vb">
+      <DependentUpon>GetDMS.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G1\SecurePentestReport.aspx.vb">
+      <DependentUpon>SecurePentestReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G2\G2SecurityReport.aspx.vb">
+      <DependentUpon>G2SecurityReport.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\GetDMSLafargeT.aspx.designer.vb">
+      <DependentUpon>GetDMSLafargeT.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G2\GetDMSLafargeT.aspx.vb">
+      <DependentUpon>GetDMSLafargeT.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\GetDriverManagement.aspx.designer.vb">
+      <DependentUpon>GetDriverManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G2\GetDriverManagement.aspx.vb">
+      <DependentUpon>GetDriverManagement.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\GetExtVoltage.aspx.designer.vb">
+      <DependentUpon>GetExtVoltage.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G2\GetExtVoltage.aspx.vb">
+      <DependentUpon>GetExtVoltage.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\GetGeofenceAlertsData.aspx.designer.vb">
+      <DependentUpon>GetGeofenceAlertsData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G2\GetGeofenceAlertsData.aspx.vb">
+      <DependentUpon>GetGeofenceAlertsData.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\GetGeofenceData.aspx.designer.vb">
+      <DependentUpon>GetGeofenceData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G2\GetGeofenceData.aspx.vb">
+      <DependentUpon>GetGeofenceData.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\GetGeofenceGeoJson.aspx.designer.vb">
+      <DependentUpon>GetGeofenceGeoJson.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G2\GetGeofenceGeoJson.aspx.vb">
+      <DependentUpon>GetGeofenceGeoJson.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\GetGroups.aspx.designer.vb">
+      <DependentUpon>GetGroups.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G2\GetGroups.aspx.vb">
+      <DependentUpon>GetGroups.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\SecureGetDMSLafargeT.aspx.vb">
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\SecureGetDriverManagement.aspx.vb">
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\SecureGetExtVoltage.aspx.vb">
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\SecureGetGeofenceAlertsData.aspx.vb">
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\SecureGetGeofenceData.aspx.vb">
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\SecureGetGeofenceGeoJson.aspx.vb">
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="G2\SecureGetGroups.aspx.vb">
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
     <Compile Include="GetOSSAreaCodeData.aspx.designer.vb">
@@ -1326,6 +1447,13 @@
       <DependentUpon>ReprocessOSSJobAll.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
+    <Compile Include="Security\AuthenticationSecurity.vb" />
+    <Compile Include="Security\CSRFProtection.vb" />
+    <Compile Include="Security\SecureBasePage.vb">
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="Security\SqlInjectionFixes.vb" />
+    <Compile Include="Security\XSSPrevention.vb" />
     <Compile Include="ServiceingLogJson.aspx.designer.vb">
       <DependentUpon>ServiceingLogJson.aspx</DependentUpon>
     </Compile>
@@ -2210,6 +2338,23 @@
     <Content Include="AdminServiceMangement.aspx" />
     <Content Include="AdminServiceMangementT.aspx" />
     <Content Include="AlertNewL1.aspx" />
+    <Content Include="bin\BouncyCastle.Crypto.dll" />
+    <Content Include="bin\ClosedXML.dll" />
+    <Content Include="bin\DocumentFormat.OpenXml.dll" />
+    <Content Include="bin\EPPlus.dll" />
+    <Content Include="bin\EPPlus.Interfaces.dll" />
+    <Content Include="bin\EPPlus.System.Drawing.dll" />
+    <Content Include="bin\Excel.dll" />
+    <Content Include="bin\ExcelLibrary.dll" />
+    <Content Include="bin\ExcelNumberFormat.dll" />
+    <Content Include="bin\FastMember.dll" />
+    <Content Include="bin\GeoJSON.Net.dll" />
+    <Content Include="bin\itextsharp.dll" />
+    <Content Include="bin\netchartdir.dll" />
+    <Content Include="bin\Newtonsoft.Json.dll" />
+    <Content Include="bin\System.Net.Http.Formatting.dll" />
+    <Content Include="bin\System.Web.Http.dll" />
+    <Content Include="bin\System.Web.Http.WebHost.dll" />
     <Content Include="buildcongeos.aspx" />
     <Content Include="CustomerCertificateNew.aspx" />
     <Content Include="dashboard\assets\img\avatars\1.png" />
@@ -3211,6 +3356,22 @@
     <Content Include="dashboard\PlantReports.aspx" />
     <Content Include="dashboard\PlantDashboard.aspx" />
     <Content Include="DriverRoleAssignManagement.aspx" />
+    <Content Include="G1\GetAlertInbox.aspx" />
+    <Content Include="G1\GetChartData.aspx" />
+    <Content Include="G1\GetChartVehicle.aspx" />
+    <Content Include="G1\GetCirclesJson.aspx" />
+    <Content Include="G1\GetClientDashData.aspx" />
+    <Content Include="G1\GetClientSoldToManagement.aspx" />
+    <Content Include="G1\GetDMS.aspx" />
+    <Content Include="G1\SecurePentestReport.aspx" />
+    <Content Include="G2\G2SecurityReport.aspx" />
+    <Content Include="G2\GetDMSLafargeT.aspx" />
+    <Content Include="G2\GetDriverManagement.aspx" />
+    <Content Include="G2\GetExtVoltage.aspx" />
+    <Content Include="G2\GetGeofenceAlertsData.aspx" />
+    <Content Include="G2\GetGeofenceData.aspx" />
+    <Content Include="G2\GetGeofenceGeoJson.aspx" />
+    <Content Include="G2\GetGroups.aspx" />
     <Content Include="GetOSSAreaCodeData.aspx" />
     <Content Include="GMapQuarry.aspx" />
     <Content Include="GMap\GMapQuarry.js" />
@@ -3218,6 +3379,7 @@
     <Content Include="js\initautoreprocessfortimeout.vbs" />
     <Content Include="js\SetTimeoutJobReprocess.vbs" />
     <Content Include="js\SetJobReprocess.vbs" />
+    <Content Include="Logs\README.txt" />
     <Content Include="OssDayReport.aspx" />
     <Content Include="OssMonthReport.aspx" />
     <Content Include="PrivateGeofenceSummaryReportTQuarry.aspx" />
@@ -7830,6 +7992,7 @@
     <Content Include="dashboard\assets\vendor\libs\quill\fonts\KaTeX_Typewriter-Regular.ttf" />
     <Content Include="dashboard\assets\vendor\libs\quill\fonts\KaTeX_Typewriter-Regular.woff" />
     <Content Include="dashboard\assets\vendor\libs\quill\fonts\KaTeX_Typewriter-Regular.woff2" />
+    <Content Include="Security\SecureWebConfig.config" />
     <None Include="Web References\SMSInsert\GlobalSimService.disco" />
     <Content Include="WebAlerts.aspx" />
     <Content Include="WorkOrderReport.aspx" />
