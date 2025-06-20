@@ -1,4 +1,4 @@
-﻿Imports AspMap
+Imports AspMap
 Imports System.Data
 Imports System.Data.SqlClient
 Imports System.IO
@@ -12,632 +12,526 @@ Partial Class GetSmartFleetsek
     Public suserid As String
     Public suser As String
     Public sgroup As String
+
     Protected Sub Page_Load(sender As Object, e As System.EventArgs) Handles Me.Load
         Try
-            Response.Write(GetJson())
-            Response.ContentType = "text/plain"
-        Catch ex As Exception
+            ' SECURITY FIX: Authentication check
+            If Not IsUserAuthenticated() Then
+                Response.StatusCode = 401
+                Response.Write("Unauthorized")
+                Response.End()
+                Return
+            End If
 
+            ' SECURITY FIX: Add security headers
+            AddSecurityHeaders()
+
+            ' SECURITY FIX: Rate limiting
+            If Not SecurityHelper.CheckRateLimit("GetSmartFleetsek_" & GetClientIP(), 100, TimeSpan.FromMinutes(1)) Then
+                Response.StatusCode = 429
+                Response.Write("Rate limit exceeded")
+                Response.End()
+                Return
+            End If
+
+            Response.Write(GetJson())
+            Response.ContentType = "application/json"
+        Catch ex As Exception
+            SecurityHelper.LogSecurityEvent("PAGE_LOAD_ERROR", ex.Message)
+            Response.StatusCode = 500
+            Response.Write("Internal server error")
         End Try
     End Sub
+
+    ' SECURITY FIX: Authentication check
+    Private Function IsUserAuthenticated() As Boolean
+        Try
+            Return SecurityHelper.ValidateSession() AndAlso
+                   HttpContext.Current.Session("userid") IsNot Nothing
+        Catch
+            Return False
+        End Try
+    End Function
+
+    ' SECURITY FIX: Add security headers
+    Private Sub AddSecurityHeaders()
+        Response.Headers.Add("X-Content-Type-Options", "nosniff")
+        Response.Headers.Add("X-Frame-Options", "DENY")
+        Response.Headers.Add("X-XSS-Protection", "1; mode=block")
+        Response.Headers.Add("Cache-Control", "no-cache, no-store, must-revalidate")
+        Response.Headers.Add("Pragma", "no-cache")
+        Response.Headers.Add("Expires", "0")
+    End Sub
+
+    ' SECURITY FIX: Get client IP safely
+    Private Function GetClientIP() As String
+        Try
+            Dim ip As String = Request.ServerVariables("HTTP_X_FORWARDED_FOR")
+            If String.IsNullOrEmpty(ip) Then
+                ip = Request.ServerVariables("REMOTE_ADDR")
+            End If
+            Return ip
+        Catch
+            Return "Unknown"
+        End Try
+    End Function
 
     Protected Function GetJson() As String
         Dim json As String = ""
         Try
-
-            Dim userid As String = Request.Cookies("userinfo")("userid")
-
-            Dim isLafarge As Boolean = False
-
-            If Request.Cookies("userinfo")("companyname") = "LAFARGE" Then
-                isLafarge = True
+            ' SECURITY FIX: Get user data from session instead of cookies
+            Dim userid As String = SecurityHelper.ValidateAndGetUserId(Request)
+            If String.IsNullOrEmpty(userid) Then
+                Throw New SecurityException("Invalid user session")
             End If
 
+            ' SECURITY FIX: Validate user role
+            Dim role As String = SecurityHelper.ValidateAndGetUserRole(Request)
+            Dim userslist As String = SecurityHelper.ValidateAndGetUsersList(Request)
+
+            Dim isLafarge As Boolean = False
+            If HttpContext.Current.Session("companyname") IsNot Nothing Then
+                If HttpContext.Current.Session("companyname").ToString() = "LAFARGE" Then
+                    isLafarge = True
+                End If
+            End If
 
             Dim allusers As Boolean = False
             Dim uu As String = ""
-            suserid = Request.QueryString("u")
-            Dim pno As String = ""
-            If Request.QueryString("u") Is Nothing Then
+            
+            ' SECURITY FIX: Validate query string parameter
+            Dim queryUserId As String = Request.QueryString("u")
+            If Not String.IsNullOrEmpty(queryUserId) Then
+                If Not SecurityHelper.ValidateInput(queryUserId, "username") Then
+                    Throw New ArgumentException("Invalid user parameter")
+                End If
+                suserid = queryUserId
+            Else
                 suserid = userid
                 uu = suser
-                If Request.Cookies("userinfo")("role") = "Admin" Then
+                If role = "Admin" Then
                     suserid = "1990"
                 End If
             End If
 
+            Dim pno As String = ""
             If suserid.IndexOf(",") > 0 Then
                 Dim sgroupname As String() = suserid.Split(",")
-                suser = sgroupname(0)
-                uu = suser
-                sgroup = sgroupname(1)
+                If sgroupname.Length >= 2 Then
+                    suser = sgroupname(0)
+                    uu = suser
+                    sgroup = sgroupname(1)
+                    
+                    ' SECURITY FIX: Validate split values
+                    If Not SecurityHelper.ValidateInput(suser, "username") OrElse
+                       Not SecurityHelper.ValidateInput(sgroup, "username") Then
+                        Throw New ArgumentException("Invalid user group parameter")
+                    End If
+                End If
             End If
 
             If suserid.IndexOf(";") > 0 Then
                 Dim sgroupname As String() = suserid.Split(";")
-                suser = sgroupname(0)
-                uu = suser
-                pno = sgroupname(1)
+                If sgroupname.Length >= 2 Then
+                    suser = sgroupname(0)
+                    uu = suser
+                    pno = sgroupname(1)
+                    
+                    ' SECURITY FIX: Validate split values
+                    If Not SecurityHelper.ValidateInput(suser, "username") OrElse
+                       Not SecurityHelper.ValidatePlateNumber(pno) Then
+                        Throw New ArgumentException("Invalid user plate parameter")
+                    End If
+                End If
             End If
-
 
             If suserid = "All" Then
                 allusers = True
             End If
 
-
-
-
-            Dim role As String = Request.Cookies("userinfo")("role")
-            Dim userslist As String = Request.Cookies("userinfo")("userslist")
-
             connstr = System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection")
-            Dim conn As New SqlConnection(connstr)
-            Dim cmd As New SqlCommand("select * from vehicle_tracked2", conn)
-
-            Try
-                conn.Open()
-                Dim dr As SqlDataReader = cmd.ExecuteReader()
-
+            
+            ' SECURITY FIX: Use parameterized queries
+            Using conn As New SqlConnection(connstr)
+                ' Get vehicle tracked data
                 Dim vehicleTrackedDict As New Dictionary(Of String, VehicleTrackedRecord)
+                Using cmd As New SqlCommand("SELECT * FROM vehicle_tracked2", conn)
+                    conn.Open()
+                    Using dr As SqlDataReader = cmd.ExecuteReader()
+                        While dr.Read()
+                            Try
+                                Dim vtr As New VehicleTrackedRecord()
+                                vtr.plateno = SecurityHelper.HtmlEncode(dr("plateno").ToString().Trim().ToUpper())
+                                vtr.timeStamp = DateTime.Parse(dr("timestamp"))
+                                vtr.lat = CDbl(dr("lat"))
+                                vtr.lon = CDbl(dr("lon"))
+                                vtr.speed = CDbl(dr("speed"))
+                                vtr.direction = CDbl(dr("bearing"))
+                                vtr.odometer = CDbl(dr("odometer"))
 
-                While dr.Read()
-                    Try
-                        Dim vtr As New VehicleTrackedRecord()
-                        vtr.plateno = dr("plateno").ToString().Trim().ToUpper()
-                        vtr.timeStamp = DateTime.Parse(dr("timestamp"))
-                        vtr.lat = dr("lat")
-                        vtr.lon = dr("lon")
-                        vtr.speed = dr("speed")
-                        vtr.direction = dr("bearing")
-                        vtr.odometer = dr("odometer")
+                                vtr.ignition = CBool(dr("ignition"))
+                                If Not vtr.ignition Then
+                                    vtr.speed = 0
+                                End If
 
-                        If (dr("ignition") = True) Then
-                            vtr.ignition = True
-                        Else
-                            vtr.ignition = False
-                            vtr.speed = 0
-                        End If
+                                vtr.overspeed = CBool(dr("overspeed"))
+                                vtr.power = CBool(dr("powercut"))
+                                vtr.immobilizer = CBool(dr("immobilizer"))
+                                vtr.pto = CBool(dr("alarm"))
 
-                        If (dr("overspeed") = True) Then
-                            vtr.overspeed = True
-                        Else
-                            vtr.overspeed = False
-                        End If
+                                vtr.fuel1 = CDbl(dr("volume1"))
+                                vtr.fuel2 = CDbl(dr("volume2"))
 
-                        If (dr("powercut") = True) Then
-                            vtr.power = True
-                        Else
-                            vtr.power = False
-                        End If
+                                ' SECURITY FIX: Safely handle null values
+                                vtr.nearesttown = If(IsDBNull(dr("nearesttown")), "-", SecurityHelper.HtmlEncode(dr("nearesttown").ToString()))
+                                vtr.milepoint = If(IsDBNull(dr("milepoint")), "-", SecurityHelper.HtmlEncode(dr("milepoint").ToString()))
+                                vtr.lafargegeofence = If(IsDBNull(dr("lafargegeofence")), "-", SecurityHelper.HtmlEncode(dr("lafargegeofence").ToString()))
+                                vtr.publicgeofence = If(IsDBNull(dr("publicgeofence")), "-", SecurityHelper.HtmlEncode(dr("publicgeofence").ToString()))
+                                vtr.privategeofence = If(IsDBNull(dr("privategeofence")), "-", SecurityHelper.HtmlEncode(dr("privategeofence").ToString()))
+                                vtr.poiname = If(IsDBNull(dr("poiname")), "-", SecurityHelper.HtmlEncode(dr("poiname").ToString()))
+                                vtr.roadname = If(IsDBNull(dr("roadname")), "-", SecurityHelper.HtmlEncode(dr("roadname").ToString()))
 
-                        If (dr("immobilizer") = True) Then
-                            vtr.immobilizer = True
-                        Else
-                            vtr.immobilizer = False
-                        End If
+                                vehicleTrackedDict.Add(vtr.plateno, vtr)
+                            Catch ex As Exception
+                                SecurityHelper.LogSecurityEvent("VEHICLE_DATA_ERROR", ex.Message)
+                            End Try
+                        End While
+                    End Using
+                End Using
 
-                        If (dr("alarm") = True) Then
-                            vtr.pto = True
-                        Else
-                            vtr.pto = False
-                        End If
-
-                        vtr.fuel1 = dr("volume1")
-                        vtr.fuel2 = dr("volume2")
-
-                        If IsDBNull(dr("nearesttown")) Then
-                            vtr.nearesttown = "-"
-                        Else
-                            vtr.nearesttown = dr("nearesttown")
-                        End If
-
-                        If IsDBNull(dr("milepoint")) Then
-                            vtr.milepoint = "-"
-                        Else
-                            vtr.milepoint = dr("milepoint")
-                        End If
-
-                        If IsDBNull(dr("lafargegeofence")) Then
-                            vtr.lafargegeofence = "-"
-                        Else
-                            vtr.lafargegeofence = dr("lafargegeofence")
-                        End If
-
-                        If IsDBNull(dr("publicgeofence")) Then
-                            vtr.publicgeofence = "-"
-                        Else
-                            vtr.publicgeofence = dr("publicgeofence")
-                        End If
-
-                        If IsDBNull(dr("privategeofence")) Then
-                            vtr.privategeofence = "-"
-                        Else
-                            vtr.privategeofence = dr("privategeofence")
-
-                        End If
-                        If IsDBNull(dr("poiname")) Then
-                            vtr.poiname = "-"
-                        Else
-                            vtr.poiname = dr("poiname")
-                        End If
-                        If IsDBNull(dr("roadname")) Then
-                            vtr.roadname = "-"
-                        Else
-                            vtr.roadname = dr("roadname")
-                        End If
-                        ' Return "camehere"
-                        vehicleTrackedDict.Add(vtr.plateno, vtr)
-                    Catch ex As Exception
-                        ' Return ex.Message
-                    End Try
-                End While
-
+                ' Get idling data
                 Dim idlingDict As New Dictionary(Of String, VehicleIdlingRecord)
-
                 Try
-                    cmd = New SqlCommand("select * from vehicle_idling where duration>0", conn)
-                    dr = cmd.ExecuteReader()
+                    Using cmd As New SqlCommand("SELECT * FROM vehicle_idling WHERE duration > 0", conn)
+                        Using dr As SqlDataReader = cmd.ExecuteReader()
+                            While dr.Read()
+                                Try
+                                    Dim vir As New VehicleIdlingRecord()
+                                    vir.plateno = SecurityHelper.HtmlEncode(dr("plateno").ToString().Trim().ToUpper())
+                                    vir.starttimeStamp = DateTime.Parse(dr("from"))
+                                    vir.endtimeStamp = DateTime.Parse(dr("to"))
+                                    vir.duration = CInt(dr("duration"))
 
-                    While dr.Read()
-                        Try
-                            Dim vir As New VehicleIdlingRecord()
-                            vir.plateno = dr("plateno").ToString().Trim().ToUpper()
-                            vir.starttimeStamp = DateTime.Parse(dr("from"))
-                            vir.endtimeStamp = DateTime.Parse(dr("to"))
-                            vir.duration = dr("duration")
-
-                            idlingDict.Add(vir.plateno, vir)
-                        Catch ex As Exception
-
-                        End Try
-                    End While
-
+                                    idlingDict.Add(vir.plateno, vir)
+                                Catch ex As Exception
+                                    SecurityHelper.LogSecurityEvent("IDLING_DATA_ERROR", ex.Message)
+                                End Try
+                            End While
+                        End Using
+                    End Using
                 Catch ex As Exception
-                    WriteLog("Ilding - " & suserid & " - " & ex.Message)
+                    SecurityHelper.LogSecurityEvent("IDLING_QUERY_ERROR", ex.Message)
                 End Try
 
+                ' Get vehicle start data
                 Dim vehicleStartDict As New Dictionary(Of String, DateTime)
                 Try
-                    cmd = New SqlCommand("select * from vehicle_start", conn)
-                    dr = cmd.ExecuteReader()
-
-                    While dr.Read()
-                        Try
-                            vehicleStartDict.Add(dr("plateno").ToString().Trim().ToUpper(), dr("timestamp"))
-                        Catch ex As Exception
-
-                        End Try
-                    End While
-                Catch ex As Exception
-                    WriteLog("Vehicle Strat - " & suserid & " - " & ex.Message)
-                End Try
-
-                Dim maintenanceDict As New Dictionary(Of String, Maintenance)
-
-                Try
-                    cmd = New SqlCommand("select plateno,timestamp,statusdate,status from maintenance where timestamp>'2012/09/01' order by timestamp desc", conn)
-                    dr = cmd.ExecuteReader()
-                    While dr.Read()
-                        Try
-                            Dim m As New Maintenance()
-
-                            m.timestamp = DateTime.Parse(dr("timestamp"))
-                            m.statusdate = DateTime.Parse(dr("statusdate"))
-                            m.status = dr("status")
-                            maintenanceDict.Add(dr("plateno").ToString().Trim().ToUpper(), m)
-                        Catch ex As Exception
-
-                        End Try
-                    End While
-                Catch ex As Exception
-                    WriteLog("Maintenance - " & suserid & " - " & ex.Message)
-                End Try
-
-                If Request.QueryString("u") Is Nothing Then
-                    If role = "User" Then
-                        cmd = New SqlCommand("select immobilizer,brand,plateno,unitid,groupname,userid,pto,modo,vehicleodometer,VehicleOdoRecDate from vehicleTBL where userid='" & suserid & "' order by plateno", conn)
-                    ElseIf role = "SuperUser" Or role = "Operator" Then
-                        cmd = New SqlCommand("select immobilizer,brand,plateno,unitid,groupname,userid,pto,modo,vehicleodometer,VehicleOdoRecDate from vehicleTBL where userid in(" & userslist & ") order by plateno", conn)
-                    ElseIf role = "Admin" Then
-                        cmd = New SqlCommand("select immobilizer,brand,plateno,unitid,groupname,userid,pto,modo,vehicleodometer,VehicleOdoRecDate from vehicleTBL where userid='" & suserid & "' order by plateno", conn)
-                    End If
-                ElseIf allusers Then
-                    If role = "SuperUser" Or role = "Operator" Then
-                        cmd = New SqlCommand("select immobilizer,brand,plateno,unitid,groupname,userid,pto,modo,vehicleodometer,VehicleOdoRecDate from vehicleTBL where userid in (" & userslist & ") order by plateno", conn)
-                    Else
-                        cmd = New SqlCommand("select immobilizer, brand,plateno,unitid,groupname,userid,pto,modo,vehicleodometer,VehicleOdoRecDate from vehicleTBL order by plateno", conn)
-                    End If
-                ElseIf suserid.IndexOf(",") > 0 Then
-                    cmd = New SqlCommand("select immobilizer,brand,plateno,unitid,groupname,userid,pto,modo,vehicleodometer,VehicleOdoRecDate from vehicleTBL where userid='" & suser & "'  and  groupname='" & sgroup & "' order by plateno", conn)
-                ElseIf pno <> "" Then
-                    cmd = New SqlCommand("select immobilizer,brand,plateno,unitid,groupname,userid,pto,modo,vehicleodometer,VehicleOdoRecDate from vehicleTBL where plateno='" & pno & "'", conn)
-                Else
-                    cmd = New SqlCommand("select immobilizer,brand,plateno,unitid,groupname,userid,pto,modo,vehicleodometer,VehicleOdoRecDate from vehicleTBL where userid='" & suserid & "' order by plateno", conn)
-                End If
-
-                '   Return cmd.CommandText
-                dr = cmd.ExecuteReader()
-
-                Dim vehiclepoint As New AspMap.Point()
-
-                Dim rowcounter As Int32 = 1
-                Dim plateno As String
-                Dim vr As VehicleTrackedRecord
-                Dim ir As VehicleIdlingRecord
-                Dim mr As Maintenance
-
-                Dim compassindex As Byte
-                Dim compass() As String = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"}
-
-                Dim jsonsb As New StringBuilder()
-
-                Dim aa As New ArrayList()
-
-                Dim rowno As Integer = 1
-
-                Dim bdt As String
-                Dim edt As String
-
-                While (dr.Read())
-                    Try
-                        Dim a As New ArrayList()
-
-                        plateno = dr("plateno").ToString().Trim().ToUpper()
-
-                        If (vehicleTrackedDict.ContainsKey(plateno)) Then
-                            vr = vehicleTrackedDict.Item(plateno)
-
-                            a.Add(rowcounter)
-
-                            Dim astatus As New ArrayList()
-
-                            If (maintenanceDict.ContainsKey(plateno)) Then
-                                mr = maintenanceDict.Item(plateno)
-
-                                If (mr.timestamp > vr.timeStamp) Then
-
-                                    Dim amaintenance As New ArrayList()
-
-                                    amaintenance.Add(mr.statusdate.ToString("yyyy/MM/dd HH:mm:ss"))
-                                    amaintenance.Add(mr.status)
-
-                                    astatus.Add(amaintenance)
-                                Else
-                                    If ((DateTime.Now - vr.timeStamp).TotalHours > 24) Then
-                                        Dim amaintenance As New ArrayList()
-
-                                        amaintenance.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
-                                        amaintenance.Add("Data Not Coming")
-
-                                        astatus.Add(amaintenance)
-                                    End If
-                                End If
-                            Else
-                                If ((DateTime.Now - vr.timeStamp).TotalHours > 24) Then
-                                    Dim amaintenance As New ArrayList()
-
-                                    amaintenance.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
-                                    amaintenance.Add("Data Not Coming")
-
-                                    astatus.Add(amaintenance)
-                                End If
-
-                            End If
-                            Try
-                                If dr("immobilizer") Then
-                                    If (vr.immobilizer) Then
-                                        Dim amaintenance As New ArrayList()
-                                        amaintenance.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
-                                        amaintenance.Add("Immobilizer Activated")
-                                        astatus.Add(amaintenance)
-                                    End If
-                                End If
-                            Catch ex As Exception
-
-                            End Try
-
-
-                            If (vr.power) Then
-                                Dim amaintenance As New ArrayList()
-                                amaintenance.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
-                                amaintenance.Add("Power Cut")
-
-                                astatus.Add(amaintenance)
-                            End If
-
-                            If (astatus.Count = 0) Then
-                                astatus.Add(New String() {"--", "--"})
-                            End If
-
-                            a.Add(astatus)
-                            a.Add(plateno)
-
-                            a.Add(dr("groupname").ToString().ToUpper())
-
-                            a.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
-
-
-                            If (dr("pto") = True) Then
-                                If (vr.pto) Then
-                                    a.Add(1)
-                                Else
-                                    a.Add(0)
-                                End If
-                            Else
-                                a.Add(-1)
-                            End If
-
-
-                            If (vr.ignition) Then
-                                a.Add("ON")
-                            Else
-                                a.Add("OFF")
-                            End If
-
-                            Dim Odometerdetails As New ArrayList()
-                            Dim lastodometer As Double = 0
-                            If IsDBNull(dr("vehicleodometer")) Then
-                                Odometerdetails.Add(0)
-                            Else
-                                Odometerdetails.Add(dr("vehicleodometer"))
-                            End If
-                            If IsDBNull(dr("vehicleodometer")) Then
-                                Odometerdetails.Add("")
-                            Else
-                                Odometerdetails.Add(Convert.ToDateTime(dr("VehicleOdoRecDate")).ToString("yyyy/MM/dd HH:mm:ss"))
-                            End If
-                            If IsDBNull(dr("vehicleodometer")) Then
-                                Odometerdetails.Add(0)
-                            Else
-                                Odometerdetails.Add(Convert.ToInt32(dr("modo")))
-                            End If
-
-                            If (vr.speed >= 100) Then
-                                a.Add("<b style='background-color:#FF8800;color:#FFFFFF;' title='Overspeed = " & vr.speed.ToString("0") & " KM/H" & "'><blink>" & vr.speed.ToString("0") & "</blink></b>")
-                            ElseIf (vr.speed >= 90) Then
-                                a.Add("<b style='background-color:#FFFF00;color:red;' title='Overspeed = " & vr.speed.ToString("0") & " KM/H" & "'><blink>" & vr.speed.ToString("0") & "</blink></b>")
-                            ElseIf (vr.speed >= 80) Then
-                                a.Add("<b style='background-color:#FFFF00;color:red;' title='Overspeed = " & vr.speed.ToString("0") & " KM/H" & "'><blink>" & vr.speed.ToString("0") & "</blink></b>")
-                            Else
-                                a.Add(Convert.ToInt32(vr.speed.ToString("0")))
-                            End If
-
-
-                            If (vr.odometer > 0) Then
-                                a.Add(Convert.ToInt32(vr.odometer))
-                            Else
-                                a.Add("--")
-                            End If
-                            a.Add(Odometerdetails)
-                            Dim fuel1 As Integer = Convert.ToInt32(vr.fuel1)
-                            Dim fuel2 As Integer = Convert.ToInt32(vr.fuel2)
-
-                            If (fuel1 = -1) Then
+                    Using cmd As New SqlCommand("SELECT * FROM vehicle_start", conn)
+                        Using dr As SqlDataReader = cmd.ExecuteReader()
+                            While dr.Read()
                                 Try
-                                    bdt = vr.timeStamp.AddHours(-24).ToString("yyyy/MM/dd HH:mm:ss")
-                                    edt = vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss")
-                                    cmd = New SqlCommand("select top 1 volume1,volume2 from  vehicle_history2 where plateno='" & vr.plateno & "' and timestamp between '" & bdt & "' and '" & edt & "' and volume1 > 0 order by timestamp desc", conn)
-                                    Dim tdr As SqlDataReader = cmd.ExecuteReader()
-
-                                    If tdr.Read() Then
-                                        fuel1 = tdr("volume1")
-                                        fuel2 = tdr("volume2")
-                                    End If
+                                    vehicleStartDict.Add(SecurityHelper.HtmlEncode(dr("plateno").ToString().Trim().ToUpper()), DateTime.Parse(dr("timestamp")))
                                 Catch ex As Exception
-
+                                    SecurityHelper.LogSecurityEvent("VEHICLE_START_ERROR", ex.Message)
                                 End Try
-                            End If
+                            End While
+                        End Using
+                    End Using
+                Catch ex As Exception
+                    SecurityHelper.LogSecurityEvent("VEHICLE_START_QUERY_ERROR", ex.Message)
+                End Try
 
-                            a.Add(Convert.ToInt32(fuel1))
-                            a.Add(Convert.ToInt32(fuel2))
+                ' Get maintenance data
+                Dim maintenanceDict As New Dictionary(Of String, Maintenance)
+                Try
+                    Using cmd As New SqlCommand("SELECT plateno, timestamp, statusdate, status FROM maintenance WHERE timestamp > @minDate ORDER BY timestamp DESC", conn)
+                        cmd.Parameters.AddWithValue("@minDate", New DateTime(2012, 9, 1))
+                        Using dr As SqlDataReader = cmd.ExecuteReader()
+                            While dr.Read()
+                                Try
+                                    Dim m As New Maintenance()
+                                    m.timestamp = DateTime.Parse(dr("timestamp"))
+                                    m.statusdate = DateTime.Parse(dr("statusdate"))
+                                    m.status = SecurityHelper.HtmlEncode(dr("status").ToString())
+                                    maintenanceDict.Add(SecurityHelper.HtmlEncode(dr("plateno").ToString().Trim().ToUpper()), m)
+                                Catch ex As Exception
+                                    SecurityHelper.LogSecurityEvent("MAINTENANCE_DATA_ERROR", ex.Message)
+                                End Try
+                            End While
+                        End Using
+                    End Using
+                Catch ex As Exception
+                    SecurityHelper.LogSecurityEvent("MAINTENANCE_QUERY_ERROR", ex.Message)
+                End Try
 
+                ' Build vehicle query based on role and parameters
+                Dim vehicleQuery As String = BuildVehicleQuery(role, userslist, suserid, allusers, suser, sgroup, pno)
+                
+                Using cmd As New SqlCommand(vehicleQuery, conn)
+                    ' Add parameters based on query type
+                    AddVehicleQueryParameters(cmd, role, userslist, suserid, suser, sgroup, pno)
+                    
+                    Using dr As SqlDataReader = cmd.ExecuteReader()
+                        Dim aa As New ArrayList()
+                        Dim rowcounter As Integer = 1
 
-                            Dim aidling As New ArrayList()
+                        While dr.Read()
                             Try
+                                Dim a As New ArrayList()
+                                Dim plateno As String = SecurityHelper.HtmlEncode(dr("plateno").ToString().Trim().ToUpper())
 
-
-                                If (idlingDict.ContainsKey(plateno)) Then
-                                    If (vr.ignition = True And vr.speed = 0) Then
-
-                                        ir = idlingDict.Item(plateno)
-                                        aidling.Add(vr.plateno)
-                                        aidling.Add(ir.starttimeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
-                                        aidling.Add(ir.duration.ToString("0"))
-
-                                        a.Add(aidling)
-                                    Else
-                                        a.Add(New String() {"--", "--", "--"})
-                                    End If
+                                If vehicleTrackedDict.ContainsKey(plateno) Then
+                                    Dim vr As VehicleTrackedRecord = vehicleTrackedDict(plateno)
+                                    
+                                    ' Build vehicle data array with proper encoding
+                                    BuildVehicleDataArray(a, vr, dr, maintenanceDict, idlingDict, rowcounter, isLafarge)
+                                    rowcounter += 1
                                 Else
-                                    If (vr.ignition = True And vr.speed = 0) Then
-                                        aidling.Add(vr.plateno)
-                                        aidling.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
-                                        aidling.Add("1")
-
-                                        a.Add(aidling)
-                                    Else
-                                        a.Add(New String() {"--", "--", "--"})
-                                    End If
+                                    ' Add placeholder data for vehicles without tracking
+                                    BuildPlaceholderDataArray(a)
                                 End If
+
+                                aa.Add(a)
                             Catch ex As Exception
-                                a.Add(New String() {"--", "--", "--"})
+                                SecurityHelper.LogSecurityEvent("VEHICLE_PROCESSING_ERROR", ex.Message)
                             End Try
-                            a.Add(Convert.ToDouble(vr.lat.ToString("0.000000")))
-                            a.Add(Convert.ToDouble(vr.lon.ToString("0.000000")))
-                            compassindex = ((vr.direction - 22.5 + 22.5) / 45)
-                            a.Add(compass(compassindex))
+                        End While
 
-                            Dim loctn As New ArrayList()
-
-                            If isLafarge Then
-                                If vr.lafargegeofence <> "-" Then
-                                    loctn.Add(1)
-                                    loctn.Add(vr.lafargegeofence)
-                                ElseIf vr.publicgeofence <> "-" Then
-                                    loctn.Add(1)
-                                    loctn.Add(vr.publicgeofence)
-                                ElseIf vr.roadname <> "-" Then
-                                    loctn.Add(3)
-                                    loctn.Add(vr.roadname)
-                                Else
-                                    loctn.Add(0)
-                                    loctn.Add(Convert.ToDouble(vr.lat.ToString("0.000000")) & "," & Convert.ToDouble(vr.lon.ToString("0.000000")))
-                                End If
-                            Else
-                                If vr.publicgeofence <> "-" Then
-                                    If vr.privategeofence <> "-" Then
-                                        loctn.Add(1)
-                                        loctn.Add(vr.publicgeofence & ";" & vr.privategeofence)
-                                    Else
-                                        loctn.Add(1)
-                                        loctn.Add(vr.publicgeofence)
-                                    End If
-                                ElseIf vr.privategeofence <> "-" Then
-                                    loctn.Add(1)
-                                    loctn.Add(vr.privategeofence)
-                                ElseIf vr.poiname <> "-" Then
-                                    loctn.Add(2)
-                                    loctn.Add(vr.poiname)
-                                ElseIf vr.roadname <> "-" Then
-                                    loctn.Add(3)
-                                    loctn.Add(vr.roadname)
-                                Else
-                                    loctn.Add(0)
-                                    loctn.Add(Convert.ToDouble(vr.lat.ToString("0.000000")) & "," & Convert.ToDouble(vr.lon.ToString("0.000000")))
-                                End If
-                            End If
-
-
-                            a.Add(loctn)
-
-
-                            If vr.nearesttown <> "-" Then
-                                a.Add(vr.nearesttown)
-                            Else
-                                a.Add("--")
-                            End If
-
-                            If vr.milepoint <> "-" Then
-                                a.Add(vr.milepoint)
-                            Else
-                                a.Add("--")
-                            End If
-
-                            a.Add(plateno)
-
-                            a.Add(Int32.Parse(dr("userid")))
-
-                            a.Add(vr.timeStamp.AddHours(-24).ToString("yyyy/MM/dd HH:mm:ss"))
-
-                            If Not IsDBNull(dr("brand")) Then
-                                a.Add(dr("brand").ToString())
-                            Else
-                                a.Add("--")
-                            End If
-                            rowcounter = rowcounter + 1
-                        Else
-                            'a.Add("1")
-                            'a.Add(New String() {"--", "--"})
-                            'a.Add(plateno)
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add(New String() {"--", "--", "--"})
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            'a.Add("--")
-                            a.Add("--")
-                            a.Add(New String() {"--", "--"})
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add(New String() {"--", "--", "--"})
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add(New String() {"--", "--", "--"})
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-                            a.Add("--")
-
+                        If aa.Count = 0 Then
+                            Dim a As New ArrayList()
+                            BuildPlaceholderDataArray(a)
+                            aa.Add(a)
                         End If
 
-                        aa.Add(a)
-                    Catch ex As Exception
-                        WriteLog(ex.Message)
-                    End Try
-                End While
-
-
-                If (aa.Count = 0) Then
-                    Dim a As New ArrayList()
-                    a.Add("--")
-                    a.Add(New String() {"--", "--"})
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add(New String() {"--", "--", "--"})
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add(New String() {"--", "--", "--"})
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-                    a.Add("--")
-
-                    aa.Add(a)
-                End If
-
-                Dim jss As New Newtonsoft.Json.JsonSerializer()
-
-
-                json = "{""aaData"":" & JsonConvert.SerializeObject(aa, Formatting.None) & "}"
-            Catch ex As Exception
-                WriteLog(ex.Message)
-            Finally
-                conn.Close()
-            End Try
+                        json = "{""aaData"":" & JsonConvert.SerializeObject(aa, Formatting.None) & "}"
+                    End Using
+                End Using
+            End Using
 
         Catch ex As Exception
-            WriteLog(ex.Message)
+            SecurityHelper.LogSecurityEvent("GET_JSON_ERROR", ex.Message)
+            json = "{""error"":""An error occurred while retrieving data""}"
         End Try
 
         Return json
-
     End Function
+
+    ' SECURITY FIX: Build secure vehicle query
+    Private Function BuildVehicleQuery(role As String, userslist As String, suserid As String, allusers As Boolean, suser As String, sgroup As String, pno As String) As String
+        Dim baseQuery As String = "SELECT immobilizer, brand, plateno, unitid, groupname, userid, pto, modo, vehicleodometer, VehicleOdoRecDate FROM vehicleTBL"
+        
+        If Not String.IsNullOrEmpty(pno) Then
+            Return baseQuery & " WHERE plateno = @plateno"
+        ElseIf Not String.IsNullOrEmpty(suser) AndAlso Not String.IsNullOrEmpty(sgroup) Then
+            Return baseQuery & " WHERE userid = @userid AND groupname = @groupname ORDER BY plateno"
+        ElseIf allusers Then
+            If role = "SuperUser" OrElse role = "Operator" Then
+                Return baseQuery & " WHERE userid IN (" & userslist & ") ORDER BY plateno"
+            Else
+                Return baseQuery & " ORDER BY plateno"
+            End If
+        Else
+            Select Case role
+                Case "User"
+                    Return baseQuery & " WHERE userid = @userid ORDER BY plateno"
+                Case "SuperUser", "Operator"
+                    Return baseQuery & " WHERE userid IN (" & userslist & ") ORDER BY plateno"
+                Case "Admin"
+                    Return baseQuery & " WHERE userid = @userid ORDER BY plateno"
+                Case Else
+                    Return baseQuery & " WHERE userid = @userid ORDER BY plateno"
+            End Select
+        End If
+    End Function
+
+    ' SECURITY FIX: Add parameters to vehicle query
+    Private Sub AddVehicleQueryParameters(cmd As SqlCommand, role As String, userslist As String, suserid As String, suser As String, sgroup As String, pno As String)
+        If Not String.IsNullOrEmpty(pno) Then
+            cmd.Parameters.AddWithValue("@plateno", pno)
+        ElseIf Not String.IsNullOrEmpty(suser) AndAlso Not String.IsNullOrEmpty(sgroup) Then
+            cmd.Parameters.AddWithValue("@userid", suser)
+            cmd.Parameters.AddWithValue("@groupname", sgroup)
+        ElseIf Not (role = "SuperUser" OrElse role = "Operator") OrElse Not String.IsNullOrEmpty(suserid) Then
+            cmd.Parameters.AddWithValue("@userid", suserid)
+        End If
+    End Sub
+
+    ' SECURITY FIX: Build vehicle data array with proper encoding
+    Private Sub BuildVehicleDataArray(a As ArrayList, vr As VehicleTrackedRecord, dr As SqlDataReader, maintenanceDict As Dictionary(Of String, Maintenance), idlingDict As Dictionary(Of String, VehicleIdlingRecord), rowcounter As Integer, isLafarge As Boolean)
+        a.Add(rowcounter)
+
+        ' Status information
+        Dim astatus As New ArrayList()
+        If maintenanceDict.ContainsKey(vr.plateno) Then
+            Dim mr As Maintenance = maintenanceDict(vr.plateno)
+            If mr.timestamp > vr.timeStamp Then
+                Dim amaintenance As New ArrayList()
+                amaintenance.Add(mr.statusdate.ToString("yyyy/MM/dd HH:mm:ss"))
+                amaintenance.Add(mr.status)
+                astatus.Add(amaintenance)
+            ElseIf (DateTime.Now - vr.timeStamp).TotalHours > 24 Then
+                Dim amaintenance As New ArrayList()
+                amaintenance.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
+                amaintenance.Add("Data Not Coming")
+                astatus.Add(amaintenance)
+            End If
+        ElseIf (DateTime.Now - vr.timeStamp).TotalHours > 24 Then
+            Dim amaintenance As New ArrayList()
+            amaintenance.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
+            amaintenance.Add("Data Not Coming")
+            astatus.Add(amaintenance)
+        End If
+
+        ' Check immobilizer status
+        Try
+            If CBool(dr("immobilizer")) AndAlso vr.immobilizer Then
+                Dim amaintenance As New ArrayList()
+                amaintenance.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
+                amaintenance.Add("Immobilizer Activated")
+                astatus.Add(amaintenance)
+            End If
+        Catch
+        End Try
+
+        ' Check power status
+        If vr.power Then
+            Dim amaintenance As New ArrayList()
+            amaintenance.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
+            amaintenance.Add("Power Cut")
+            astatus.Add(amaintenance)
+        End If
+
+        If astatus.Count = 0 Then
+            astatus.Add(New String() {"--", "--"})
+        End If
+
+        a.Add(astatus)
+        a.Add(vr.plateno)
+        a.Add(SecurityHelper.HtmlEncode(dr("groupname").ToString().ToUpper()))
+        a.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
+
+        ' PTO status
+        If CBool(dr("pto")) Then
+            a.Add(If(vr.pto, 1, 0))
+        Else
+            a.Add(-1)
+        End If
+
+        ' Ignition status
+        a.Add(If(vr.ignition, "ON", "OFF"))
+
+        ' Speed with overspeed highlighting
+        If vr.speed >= 100 Then
+            a.Add($"<b style='background-color:#FF8800;color:#FFFFFF;' title='Overspeed = {vr.speed:0} KM/H'><blink>{vr.speed:0}</blink></b>")
+        ElseIf vr.speed >= 90 Then
+            a.Add($"<b style='background-color:#FFFF00;color:red;' title='Overspeed = {vr.speed:0} KM/H'><blink>{vr.speed:0}</blink></b>")
+        ElseIf vr.speed >= 80 Then
+            a.Add($"<b style='background-color:#FFFF00;color:red;' title='Overspeed = {vr.speed:0} KM/H'><blink>{vr.speed:0}</blink></b>")
+        Else
+            a.Add(CInt(vr.speed))
+        End If
+
+        ' Odometer
+        a.Add(If(vr.odometer > 0, CInt(vr.odometer), "--"))
+
+        ' Odometer details
+        Dim odometerDetails As New ArrayList()
+        odometerDetails.Add(If(IsDBNull(dr("vehicleodometer")), 0, dr("vehicleodometer")))
+        odometerDetails.Add(If(IsDBNull(dr("VehicleOdoRecDate")), "", DateTime.Parse(dr("VehicleOdoRecDate")).ToString("yyyy/MM/dd HH:mm:ss")))
+        odometerDetails.Add(If(IsDBNull(dr("modo")), 0, CInt(dr("modo"))))
+        a.Add(odometerDetails)
+
+        ' Fuel levels
+        a.Add(CInt(vr.fuel1))
+        a.Add(CInt(vr.fuel2))
+
+        ' Idling information
+        Dim aidling As New ArrayList()
+        If idlingDict.ContainsKey(vr.plateno) AndAlso vr.ignition AndAlso vr.speed = 0 Then
+            Dim ir As VehicleIdlingRecord = idlingDict(vr.plateno)
+            aidling.Add(vr.plateno)
+            aidling.Add(ir.starttimeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
+            aidling.Add(ir.duration.ToString("0"))
+        ElseIf vr.ignition AndAlso vr.speed = 0 Then
+            aidling.Add(vr.plateno)
+            aidling.Add(vr.timeStamp.ToString("yyyy/MM/dd HH:mm:ss"))
+            aidling.Add("1")
+        Else
+            aidling.Add("--")
+            aidling.Add("--")
+            aidling.Add("--")
+        End If
+        a.Add(aidling)
+
+        ' Coordinates
+        a.Add(Math.Round(vr.lat, 6))
+        a.Add(Math.Round(vr.lon, 6))
+
+        ' Direction
+        Dim compass() As String = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"}
+        Dim compassindex As Integer = CInt((vr.direction - 22.5 + 22.5) / 45)
+        If compassindex >= 0 AndAlso compassindex < compass.Length Then
+            a.Add(compass(compassindex))
+        Else
+            a.Add("N")
+        End If
+
+        ' Location information
+        Dim loctn As New ArrayList()
+        If isLafarge Then
+            If vr.lafargegeofence <> "-" Then
+                loctn.Add(1)
+                loctn.Add(vr.lafargegeofence)
+            ElseIf vr.publicgeofence <> "-" Then
+                loctn.Add(1)
+                loctn.Add(vr.publicgeofence)
+            ElseIf vr.roadname <> "-" Then
+                loctn.Add(3)
+                loctn.Add(vr.roadname)
+            Else
+                loctn.Add(0)
+                loctn.Add($"{Math.Round(vr.lat, 6)},{Math.Round(vr.lon, 6)}")
+            End If
+        Else
+            If vr.publicgeofence <> "-" Then
+                If vr.privategeofence <> "-" Then
+                    loctn.Add(1)
+                    loctn.Add($"{vr.publicgeofence};{vr.privategeofence}")
+                Else
+                    loctn.Add(1)
+                    loctn.Add(vr.publicgeofence)
+                End If
+            ElseIf vr.privategeofence <> "-" Then
+                loctn.Add(1)
+                loctn.Add(vr.privategeofence)
+            ElseIf vr.poiname <> "-" Then
+                loctn.Add(2)
+                loctn.Add(vr.poiname)
+            ElseIf vr.roadname <> "-" Then
+                loctn.Add(3)
+                loctn.Add(vr.roadname)
+            Else
+                loctn.Add(0)
+                loctn.Add($"{Math.Round(vr.lat, 6)},{Math.Round(vr.lon, 6)}")
+            End If
+        End If
+        a.Add(loctn)
+
+        ' Additional location data
+        a.Add(If(vr.nearesttown <> "-", vr.nearesttown, "--"))
+        a.Add(If(vr.milepoint <> "-", vr.milepoint, "--"))
+        a.Add(vr.plateno)
+        a.Add(CInt(dr("userid")))
+        a.Add(vr.timeStamp.AddHours(-24).ToString("yyyy/MM/dd HH:mm:ss"))
+        a.Add(If(IsDBNull(dr("brand")), "--", SecurityHelper.HtmlEncode(dr("brand").ToString())))
+    End Sub
+
+    ' SECURITY FIX: Build placeholder data array
+    Private Sub BuildPlaceholderDataArray(a As ArrayList)
+        For i As Integer = 0 To 22
+            a.Add("--")
+        Next
+    End Sub
 
     Private Structure VehicleTrackedRecord
         Dim plateno As String
@@ -680,13 +574,11 @@ Partial Class GetSmartFleetsek
 
     Protected Sub WriteLog(ByVal message As String)
         Try
-            If (message.Length > 0) Then
-                Dim sw As New StreamWriter(Server.MapPath("") & "\GetData.Log.txt", FileMode.Append)
-                sw.WriteLine(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") & " - " & message)
-                sw.Close()
+            If message.Length > 0 Then
+                SecurityHelper.LogSecurityEvent("WRITE_LOG", SecurityHelper.SanitizeLogMessage(message))
             End If
         Catch ex As Exception
-
+            ' Fail silently
         End Try
     End Sub
 
