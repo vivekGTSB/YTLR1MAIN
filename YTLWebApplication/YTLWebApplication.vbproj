@@ -492,6 +492,54 @@
     <Compile Include="G2\SecureGetGroups.aspx.vb">
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
+    <Compile Include="G6\GetSmartFleetsek.aspx.designer.vb">
+      <DependentUpon>GetSmartFleetsek.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetSmartFleetsek.aspx.vb">
+      <DependentUpon>GetSmartFleetsek.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetSMSNotificationData.aspx.designer.vb">
+      <DependentUpon>GetSMSNotificationData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetSMSNotificationData.aspx.vb">
+      <DependentUpon>GetSMSNotificationData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetSoldToManagement.aspx.designer.vb">
+      <DependentUpon>GetSoldToManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetSoldToManagement.aspx.vb">
+      <DependentUpon>GetSoldToManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetStatusPopup.aspx.designer.vb">
+      <DependentUpon>GetStatusPopup.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetStatusPopup.aspx.vb">
+      <DependentUpon>GetStatusPopup.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetTrailerData.aspx.designer.vb">
+      <DependentUpon>GetTrailerData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetTrailerData.aspx.vb">
+      <DependentUpon>GetTrailerData.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetUsers.aspx.designer.vb">
+      <DependentUpon>GetUsers.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetUsers.aspx.vb">
+      <DependentUpon>GetUsers.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetVehiclesInGeofence.aspx.designer.vb">
+      <DependentUpon>GetVehiclesInGeofence.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetVehiclesInGeofence.aspx.vb">
+      <DependentUpon>GetVehiclesInGeofence.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetViolationDailyReport.aspx.designer.vb">
+      <DependentUpon>GetViolationDailyReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="G6\GetViolationDailyReport.aspx.vb">
+      <DependentUpon>GetViolationDailyReport.aspx</DependentUpon>
+    </Compile>
     <Compile Include="GetOSSAreaCodeData.aspx.designer.vb">
       <DependentUpon>GetOSSAreaCodeData.aspx</DependentUpon>
     </Compile>
@@ -3372,6 +3420,14 @@
     <Content Include="G2\GetGeofenceData.aspx" />
     <Content Include="G2\GetGeofenceGeoJson.aspx" />
     <Content Include="G2\GetGroups.aspx" />
+    <Content Include="G6\GetSmartFleetsek.aspx" />
+    <Content Include="G6\GetSMSNotificationData.aspx" />
+    <Content Include="G6\GetSoldToManagement.aspx" />
+    <Content Include="G6\GetStatusPopup.aspx" />
+    <Content Include="G6\GetTrailerData.aspx" />
+    <Content Include="G6\GetUsers.aspx" />
+    <Content Include="G6\GetVehiclesInGeofence.aspx" />
+    <Content Include="G6\GetViolationDailyReport.aspx" />
     <Content Include="GetOSSAreaCodeData.aspx" />
     <Content Include="GMapQuarry.aspx" />
     <Content Include="GMap\GMapQuarry.js" />
