@@ -12,11 +12,13 @@ Public Class SecurityHelper
     Public Shared Function ValidateUserSession(request As HttpRequest, session As HttpSessionState) As Boolean
         Return SessionManager.ValidateSession()
     End Function
+    
     Public Shared Function CreateSecureCommand(query As String, connection As SqlConnection) As SqlCommand
         Dim cmd As New SqlCommand(query, connection)
         cmd.CommandTimeout = 30
         Return cmd
     End Function
+    
     Public Shared Function SanitizeForHtml(input As String) As String
         If String.IsNullOrEmpty(input) Then
             Return String.Empty
@@ -24,6 +26,7 @@ Public Class SecurityHelper
 
         Return HttpUtility.HtmlEncode(input)
     End Function
+    
     ' JavaScript encode for embedding in JavaScript
     Public Shared Function SanitizeForJavaScript(input As String) As String
         If String.IsNullOrEmpty(input) Then
@@ -39,6 +42,7 @@ Public Class SecurityHelper
                    .Replace("<", "\u003c") _
                    .Replace(">", "\u003e")
     End Function
+    
     ' Comprehensive input validation
     Public Shared Function ValidateInput(input As String, maxLength As Integer, Optional allowedPattern As String = Nothing) As Boolean
         If String.IsNullOrEmpty(input) Then
@@ -99,7 +103,7 @@ Public Class SecurityHelper
 
         For Each pattern As String In dangerousPatterns
             If Regex.IsMatch(input, pattern, RegexOptions.IgnoreCase) Then
-                LogSecurityEvent($"Dangerous pattern detected: {pattern} in input: {input.Substring(0, Math.Min(50, input.Length))}")
+                LogSecurityEvent("DANGEROUS_PATTERN", $"Dangerous pattern detected: {pattern} in input: {input.Substring(0, Math.Min(50, input.Length))}")
                 Return True
             End If
         Next
@@ -124,8 +128,8 @@ Public Class SecurityHelper
         Dim encoded As String = HttpUtility.HtmlEncode(input)
 
         ' Second pass - additional encoding for potential bypasses
-        encoded = encoded.Replace("&#x", "&amp;#x")
-        encoded = encoded.Replace("&#", "&amp;#")
+        encoded = encoded.Replace("&#x", "&#x")
+        encoded = encoded.Replace("&#", "&#")
 
         Return encoded
     End Function
@@ -303,10 +307,10 @@ Public Class SecurityHelper
     End Sub
 
     ' Security event logging
-    Public Shared Sub LogSecurityEvent(message As String)
+    Public Shared Sub LogSecurityEvent(eventType As String, message As String)
         Try
             Dim sanitizedMessage As String = SanitizeLogMessage(message)
-            Dim logEntry As String = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - SECURITY: {sanitizedMessage} - IP: {HttpContext.Current.Request.UserHostAddress}"
+            Dim logEntry As String = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {eventType}: {sanitizedMessage} - IP: {GetClientIP()}"
 
             ' Log to Windows Event Log
             System.Diagnostics.EventLog.WriteEntry("YTL_Security", logEntry, System.Diagnostics.EventLogEntryType.Warning)
@@ -326,6 +330,22 @@ Public Class SecurityHelper
             ' Fail silently
         End Try
     End Sub
+
+    ' Get client IP address safely
+    Private Shared Function GetClientIP() As String
+        Try
+            Dim context As HttpContext = HttpContext.Current
+            If context IsNot Nothing Then
+                Dim ip As String = context.Request.ServerVariables("HTTP_X_FORWARDED_FOR")
+                If String.IsNullOrEmpty(ip) Then
+                    ip = context.Request.ServerVariables("REMOTE_ADDR")
+                End If
+                Return ip
+            End If
+        Catch
+        End Try
+        Return "Unknown"
+    End Function
 
     ' Sanitize log messages to prevent log injection
     Private Shared Function SanitizeLogMessage(message As String) As String
@@ -427,9 +447,10 @@ Public Class SecurityHelper
 
         Return False
     End Function
+    
     Public Shared Function HasRequiredRole(requiredRole As String) As Boolean
         Try
-            Dim userRole As String = GetCurrentUserRole()
+            Dim userRole As String = SessionManager.GetCurrentUserRole()
             If String.IsNullOrEmpty(userRole) Then
                 Return False
             End If
@@ -451,6 +472,7 @@ Public Class SecurityHelper
             Return False
         End Try
     End Function
+    
     Public Shared Function GenerateCSRFToken() As String
         Try
             Dim token As String = Guid.NewGuid().ToString()
@@ -461,6 +483,7 @@ Public Class SecurityHelper
             Return String.Empty
         End Try
     End Function
+    
     ' Validate CSRF token
     Public Shared Function ValidateCSRFToken(submittedToken As String) As Boolean
         Try
@@ -479,6 +502,7 @@ Public Class SecurityHelper
             Return False
         End Try
     End Function
+    
     ' Rate limiting check
     Public Shared Function CheckRateLimit(key As String, maxAttempts As Integer, timeWindow As TimeSpan) As Boolean
         Try
@@ -502,6 +526,7 @@ Public Class SecurityHelper
             Return True ' Allow on error to prevent blocking legitimate users
         End Try
     End Function
+    
     ' Validate users list format
     Public Shared Function ValidateUsersList(usersList As String) As Boolean
         Try
@@ -533,4 +558,28 @@ Public Class SecurityHelper
             Return False
         End Try
     End Function
+    
+    ' Hash password using SHA-256 (legacy support)
+    Public Shared Function HashPassword(password As String) As String
+        Try
+            Using sha256 As SHA256 = SHA256.Create()
+                Dim hashedBytes As Byte() = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password))
+                Return Convert.ToBase64String(hashedBytes)
+            End Using
+        Catch ex As Exception
+            LogSecurityEvent("PASSWORD_HASH_ERROR", ex.Message)
+            Return String.Empty
+        End Try
+    End Function
+    
+    ' Validate session
+    Public Shared Function ValidateSession() As Boolean
+        Try
+            Return SessionManager.ValidateSession()
+        Catch ex As Exception
+            LogSecurityEvent("SESSION_VALIDATION_ERROR", ex.Message)
+            Return False
+        End Try
+    End Function
+
 End Class

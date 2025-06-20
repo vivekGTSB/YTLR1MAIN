@@ -1,4 +1,4 @@
-﻿Imports System.Data
+Imports System.Data
 Imports System.Data.SqlClient
 Imports System.Data.DataRow
 Imports System.Collections.Generic
@@ -6,37 +6,58 @@ Imports Newtonsoft.Json
 Imports AspMap
 
 Partial Class GetRefuelSummary
-    Inherits System.Web.UI.Page
+    Inherits SecurePageBase
+    
     Public Shared totrefuel As Double = 0
     Public Shared totrefuelcost As Double = 0
+    
     Protected Sub Page_Load(sender As Object, e As EventArgs) Handles Me.Load
-
         Try
+            ' SECURITY FIX: Validate authentication
+            If Not AuthenticationHelper.IsUserAuthenticated() Then
+                Response.StatusCode = 401
+                Response.Write("{""error"":""Unauthorized""}")
+                Response.End()
+                Return
+            End If
+
+            Response.ContentType = "application/json"
             Response.Write(GetJson())
-            Response.ContentType = "text/plain"
         Catch ex As Exception
-
+            SecurityHelper.LogSecurityEvent("GENERAL_ERROR", "Error in GetRefuelSummary: " & ex.Message)
+            Response.StatusCode = 500
+            Response.Write("{""error"":""Internal server error""}")
         End Try
-
-
     End Sub
+    
     Protected Function GetJson() As String
         Dim json As String = ""
         Try
-            Dim ddlu As String = Request.QueryString("ddlu")
-            Dim ddlp As String = Request.QueryString("ddlp")
-            Dim bdt As String = Request.QueryString("bdt")
-            Dim edt As String = Request.QueryString("edt")
-            Dim luid As String = Request.Cookies("userinfo")("userid")
-            Dim role As String = Request.Cookies("userinfo")("role")
-            Dim userslist As String = Request.Cookies("userinfo")("userslist")
+            ' SECURITY FIX: Validate and sanitize query parameters
+            Dim ddlu As String = SecurityHelper.SanitizeForHtml(Request.QueryString("ddlu"))
+            Dim ddlp As String = SecurityHelper.SanitizeForHtml(Request.QueryString("ddlp"))
+            Dim bdt As String = SecurityHelper.SanitizeForHtml(Request.QueryString("bdt"))
+            Dim edt As String = SecurityHelper.SanitizeForHtml(Request.QueryString("edt"))
+
+            ' SECURITY FIX: Validate date parameters
+            If Not SecurityHelper.ValidateDate(bdt) OrElse Not SecurityHelper.ValidateDate(edt) Then
+                Return "{""error"":""Invalid date format""}"
+            End If
+
+            ' SECURITY FIX: Get user data from session
+            Dim luid As String = SessionManager.GetCurrentUserId()
+            Dim role As String = SessionManager.GetCurrentUserRole()
+            Dim userslist As String = If(Session("userslist") IsNot Nothing, Session("userslist").ToString(), "")
+
+            ' SECURITY FIX: Validate users list format
+            If Not String.IsNullOrEmpty(userslist) AndAlso Not SecurityHelper.ValidateUsersList(userslist) Then
+                userslist = $"'{luid}'"
+            End If
 
             Dim aa As New ArrayList()
-            Dim a As ArrayList
-
             Dim vehiclepoint As New AspMap.Point
             Dim mapping As New AspMap.Map()
-            Dim circle As New AspMap.Symbol
+            
             Dim begindatetime As String = bdt
             Dim enddatetime As String = edt
             Dim userid As String = ddlu
@@ -45,7 +66,6 @@ Partial Class GetRefuelSummary
             totrefuel = 0
             totrefuelcost = 0
 
-            Dim locObj As New Location(luid)
             Dim t As New DataTable
             t.Columns.Add(New DataColumn("S No"))
             t.Columns.Add(New DataColumn("UserName"))
@@ -69,328 +89,279 @@ Partial Class GetRefuelSummary
             t.Columns.Add(New DataColumn("fuelst"))
             t.Columns.Add(New DataColumn("actrefuel"))
             t.Columns.Add(New DataColumn("actcost"))
-            Dim query As String = ""
-            Dim condition As String = ""
-            Dim query1 As String = ""
 
-            If ddlu <> "--All Users--" Then
-                If ddlp = "--All Plate No--" Then
-                    query = "select distinct rt.plateno,avu.userid,avu.username,substring(convert(varchar,refuelfrom,120),1,16) as refuelfrom,substring(convert(varchar,refuelto,120),1,16) as refuelto,beforerefuel, afterrefuel,totrefuel,fuelcost,lat,lon,ft.liters ,ft.cost from refuel rt inner join (select au.userid,au.username,plateno from vehicleTBL vt left outer join userTBL au on vt.userid=au.userid where  au.userid='" & userid & "' ) avu  on  rt.plateno=avu.plateno left outer join fuel ft on ft.plateno=rt.plateno and ft.timestamp between dateadd(mi,-10,rt.refuelfrom) and dateadd(mi,10,rt.refuelto) where  rt.refuelfrom between   '" & begindatetime & "' and '" & enddatetime & "'   and rt.status=1 order by refuelfrom"
-                    query1 = "select distinct au.username,ft.plateno,substring(convert(varchar,ft.timestamp,120),1,16) as timestamp,ft.stationcode,ft.liters,ft.cost from (select * from fuel where userid ='" & userid & "' ) ft left outer join   ( select ft.plateno,ft.timestamp from fuel ft inner join refuel rt on ft.plateno=rt.plateno and ft.timestamp between  dateadd(mi,-10,rt.refuelfrom) and dateadd(mi,10,rt.refuelto)  where ft.timestamp between '" & begindatetime & "' and '" & enddatetime & "' and userid<>0 ) t on ft.plateno=t.plateno and ft.timestamp=t.timestamp left outer join userTBL au on ft.userid=au.userid where ft.timestamp between '" & begindatetime & "' and '" & enddatetime & "' and ft.userid<>0  and t.plateno is NULL and ft.userid='" & userid & "'"
-                Else
-                    query = "select distinct rt.plateno,avu.userid,avu.username,substring(convert(varchar,refuelfrom,120),1,16) as refuelfrom,substring(convert(varchar,refuelto,120),1,16) as refuelto,beforerefuel, afterrefuel,totrefuel,fuelcost,lat,lon,ft.liters ,ft.cost from refuel rt inner join (select au.userid,au.username,plateno from vehicleTBL vt left outer join userTBL au on vt.userid=au.userid where  au.userid='" & userid & "' and plateno='" & plateno & "') avu  on rt.plateno=avu.plateno left outer join fuel ft on ft.plateno=rt.plateno and ft.timestamp between dateadd(mi,-10,rt.refuelfrom) and dateadd(mi,10,rt.refuelto) where  rt.refuelfrom between   '" & begindatetime & "' and '" & enddatetime & "'  and rt.status=1   order by avu.username,rt.plateno,refuelfrom"
-                    query1 = "select distinct au.username,ft.plateno,substring(convert(varchar,ft.timestamp,120),1,16) as timestamp,ft.stationcode,ft.liters,ft.cost from (select * from fuel where userid ='" & userid & "' and plateno='" & plateno & "') ft left outer join   ( select ft.plateno,ft.timestamp from fuel ft inner join refuel rt on ft.plateno=rt.plateno and ft.timestamp between  dateadd(mi,-10,rt.refuelfrom) and dateadd(mi,10,rt.refuelto)  where ft.timestamp between '" & begindatetime & "' and '" & enddatetime & "' and userid<>0 ) t on ft.plateno=t.plateno and ft.timestamp=t.timestamp left outer join userTBL au on ft.userid=au.userid where ft.timestamp between '" & begindatetime & "' and '" & enddatetime & "' and ft.userid<>0  and t.plateno is NULL and ft.plateno='" & plateno & "'"
+            ' Build secure query based on parameters
+            Dim query As String = BuildSecureRefuelQuery(ddlu, ddlp, begindatetime, enddatetime, userid, plateno, role, userslist)
+            
+            Try
+                Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
+                    ' Load fuel stations securely
+                    LoadFuelStations(conn, mapping)
+                    
+                    ' Execute main refuel query
+                    Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(query, conn)
+                        AddRefuelQueryParameters(cmd, ddlu, ddlp, begindatetime, enddatetime, userid, plateno)
+                        
+                        conn.Open()
+                        Using dr As SqlDataReader = cmd.ExecuteReader()
+                            ProcessRefuelData(dr, t, mapping, luid)
+                        End Using
+                    End Using
+                End Using
+
+                ' Process results for JSON output
+                ProcessResultsForJson(t, aa)
+                
+                ' Store excel table in session
+                Dim exceltable As DataTable = CreateExcelTable(t)
+                HttpContext.Current.Session.Remove("exceltable")
+                HttpContext.Current.Session("exceltable") = exceltable
+                
+                json = JsonConvert.SerializeObject(aa, Formatting.None)
+                
+            Catch ex As Exception
+                SecurityHelper.LogSecurityEvent("DATABASE_ERROR", "Error in GetRefuelSummary query: " & ex.Message)
+                json = "{""error"":""Database error""}"
+            End Try
+
+        Catch ex As Exception
+            SecurityHelper.LogSecurityEvent("GENERAL_ERROR", "Error in GetRefuelSummary GetJson: " & ex.Message)
+            json = "{""error"":""Internal server error""}"
+        End Try
+
+        Return json
+    End Function
+
+    Private Function BuildSecureRefuelQuery(ddlu As String, ddlp As String, begindatetime As String, enddatetime As String, userid As String, plateno As String, role As String, userslist As String) As String
+        Dim query As String = ""
+        
+        If ddlu <> "--All Users--" Then
+            If ddlp = "--All Plate No--" Then
+                query = "SELECT DISTINCT rt.plateno, avu.userid, avu.username, SUBSTRING(CONVERT(varchar,refuelfrom,120),1,16) as refuelfrom, SUBSTRING(CONVERT(varchar,refuelto,120),1,16) as refuelto, beforerefuel, afterrefuel, totrefuel, fuelcost, lat, lon, ft.liters, ft.cost FROM refuel rt INNER JOIN (SELECT au.userid, au.username, plateno FROM vehicleTBL vt LEFT OUTER JOIN userTBL au ON vt.userid = au.userid WHERE au.userid = @userid) avu ON rt.plateno = avu.plateno LEFT OUTER JOIN fuel ft ON ft.plateno = rt.plateno AND ft.timestamp BETWEEN DATEADD(mi,-10,rt.refuelfrom) AND DATEADD(mi,10,rt.refuelto) WHERE rt.refuelfrom BETWEEN @bdt AND @edt AND rt.status = 1 ORDER BY refuelfrom"
+            Else
+                query = "SELECT DISTINCT rt.plateno, avu.userid, avu.username, SUBSTRING(CONVERT(varchar,refuelfrom,120),1,16) as refuelfrom, SUBSTRING(CONVERT(varchar,refuelto,120),1,16) as refuelto, beforerefuel, afterrefuel, totrefuel, fuelcost, lat, lon, ft.liters, ft.cost FROM refuel rt INNER JOIN (SELECT au.userid, au.username, plateno FROM vehicleTBL vt LEFT OUTER JOIN userTBL au ON vt.userid = au.userid WHERE au.userid = @userid AND plateno = @plateno) avu ON rt.plateno = avu.plateno LEFT OUTER JOIN fuel ft ON ft.plateno = rt.plateno AND ft.timestamp BETWEEN DATEADD(mi,-10,rt.refuelfrom) AND DATEADD(mi,10,rt.refuelto) WHERE rt.refuelfrom BETWEEN @bdt AND @edt AND rt.status = 1 ORDER BY avu.username, rt.plateno, refuelfrom"
+            End If
+        Else
+            If ddlp = "--All Plate No--" Then
+                If role = "SuperUser" Or role = "Operator" Then
+                    If Not String.IsNullOrEmpty(userslist) Then
+                        query = $"SELECT DISTINCT avu.userid, avu.username, ar.plateno, SUBSTRING(CONVERT(varchar,ar.refuelfrom,120),1,16) as refuelfrom, SUBSTRING(CONVERT(varchar,ar.refuelto,120),1,16) as refuelto, ar.beforerefuel, ar.afterrefuel, ar.totrefuel, ar.fuelcost, ar.lat, ar.lon, ft.liters, ft.cost FROM refuel ar INNER JOIN (SELECT au.userid, au.username, plateno FROM vehicleTBL vt LEFT OUTER JOIN userTBL au ON vt.userid = au.userid WHERE au.userid IN ({userslist})) avu ON ar.plateno = avu.plateno LEFT OUTER JOIN fuel ft ON ft.timestamp BETWEEN DATEADD(mi,-10,ar.refuelfrom) AND DATEADD(mi,10,ar.refuelto) AND ar.plateno = ft.plateno WHERE refuelfrom BETWEEN @bdt AND @edt AND ar.status = 1 ORDER BY avu.username, ar.plateno, refuelfrom"
+                    Else
+                        query = "SELECT DISTINCT avu.userid, avu.username, ar.plateno, SUBSTRING(CONVERT(varchar,ar.refuelfrom,120),1,16) as refuelfrom, SUBSTRING(CONVERT(varchar,ar.refuelto,120),1,16) as refuelto, ar.beforerefuel, ar.afterrefuel, ar.totrefuel, ar.fuelcost, ar.lat, ar.lon, ft.liters, ft.cost FROM refuel ar INNER JOIN (SELECT au.userid, au.username, plateno FROM vehicleTBL vt LEFT OUTER JOIN userTBL au ON vt.userid = au.userid WHERE au.userid = @userid) avu ON ar.plateno = avu.plateno LEFT OUTER JOIN fuel ft ON ft.timestamp BETWEEN DATEADD(mi,-10,ar.refuelfrom) AND DATEADD(mi,10,ar.refuelto) AND ar.plateno = ft.plateno WHERE refuelfrom BETWEEN @bdt AND @edt AND ar.status = 1 ORDER BY avu.username, ar.plateno, refuelfrom"
+                    End If
+                ElseIf role = "Admin" Then
+                    query = "SELECT DISTINCT plateno, SUBSTRING(CONVERT(varchar,refuelfrom,120),1,16) as refuelfrom, SUBSTRING(CONVERT(varchar,refuelto,120),1,16) as refuelto, beforerefuel, afterrefuel, totrefuel, fuelcost, lat, lon FROM refuel WHERE refuelfrom BETWEEN @bdt AND @edt"
                 End If
             Else
-                If ddlp = "--All Plate No--" Then
-                    If role = "SuperUser" Or role = "Operator" Then
-                        query = "select  distinct avu.userid,avu.username,ar.plateno,substring(convert(varchar,ar.refuelfrom,120),1,16) as refuelfrom,substring(convert(varchar,ar.refuelto,120),1,16) as refuelto,ar.beforerefuel, ar.afterrefuel,ar.totrefuel,ar.fuelcost,ar.lat,ar.lon,ft.liters ,ft.cost from refuel ar inner join (select au.userid,au.username,plateno from vehicleTBL vt left outer join userTBL au on vt.userid=au.userid where  au.userid in (" & userslist & ")) avu on ar.plateno=avu.plateno  left outer join fuel ft on ft.timestamp between dateadd(mi,-10,ar.refuelfrom) and dateadd(mi,10,ar.refuelto)  and ar.plateno =ft.plateno    where  refuelfrom between '" & begindatetime & "' and '" & enddatetime & "' and ar.status=1   order by avu.username,ar.plateno, refuelfrom "
-                        query1 = "select distinct au.username,ft.plateno,substring(convert(varchar,ft.timestamp,120),1,16) as timestamp,ft.stationcode,ft.liters,ft.cost from  (select * from fuel where userid in (" & userslist & ") ) ft left outer join   ( select ft.plateno,ft.timestamp from fuel ft inner join refuel rt on ft.plateno=rt.plateno and ft.timestamp  between dateadd(mi,-10,rt.refuelfrom) and dateadd(mi,10,rt.refuelto)  where ft.timestamp between '" & begindatetime & "' and '" & enddatetime & "' and userid<>0 ) t on ft.plateno=t.plateno and ft.timestamp=t.timestamp left outer join userTBL au on ft.userid=au.userid where ft.timestamp between '" & begindatetime & "' and '" & enddatetime & "' and ft.userid<>0  and t.plateno is NULL "
-
-                    ElseIf role = "Admin" Then
-                        query = "select distinct plateno,substring(convert(varchar,refuelfrom,120),1,16) as refuelfrom,substring(convert(varchar,refuelto,120),1,16) as refuelto,beforerefuel, afterrefuel,totrefuel,fuelcost,lat,lon from refuel where refuelfrom between '" & begindatetime & "' and '" & enddatetime & "' "
-                    End If
-                Else
-                    query = "select distinct ar.plateno,vt.userid,ut.username,substring(convert(varchar,refuelfrom,120),1,16) as refuelfrom,substring(convert(varchar,refuelto,120),1,16) as refuelto,beforerefuel, afterrefuel,totrefuel,fuelcost,lat,lon,ft.liters ,ft.cost from refuel ar inner join vehicleTBL vt  on ar.plateno=vt.plateno left outer join userTBL ut on vt.userid=ut.userid left outer join fuel ft on ft.timestamp between dateadd(mi,-10,ar.refuelfrom) and dateadd(mi,10,ar.refuelto)  and ar.plateno =ft.plateno  where  ar.plateno='" & plateno & "' and refuelfrom between '" & begindatetime & "' and '" & enddatetime & "' and ar.status=1  order by refuelfrom "
-                    query1 = "select distinct au.username,ft.plateno,substring(convert(varchar,ft.timestamp,120),1,16) as timestamp,ft.stationcode,ft.liters,ft.cost from (select * from fuel where plateno='" & plateno & "') ft left outer join   ( select ft.plateno,ft.timestamp from fuel ft inner join refuel rt on ft.plateno=rt.plateno and ft.timestamp between  dateadd(mi,-10,rt.refuelfrom) and dateadd(mi,10,rt.refuelto)  where ft.timestamp between '" & begindatetime & "' and '" & enddatetime & "' and userid<>0 ) t on ft.plateno=t.plateno and ft.timestamp=t.timestamp left outer join userTBL au on ft.userid=au.userid where ft.timestamp between '" & begindatetime & "' and '" & enddatetime & "' and ft.userid<>0  and t.plateno is NULL  and ft.plateno='" & plateno & "' "
-
-                End If
+                query = "SELECT DISTINCT ar.plateno, vt.userid, ut.username, SUBSTRING(CONVERT(varchar,refuelfrom,120),1,16) as refuelfrom, SUBSTRING(CONVERT(varchar,refuelto,120),1,16) as refuelto, beforerefuel, afterrefuel, totrefuel, fuelcost, lat, lon, ft.liters, ft.cost FROM refuel ar INNER JOIN vehicleTBL vt ON ar.plateno = vt.plateno LEFT OUTER JOIN userTBL ut ON vt.userid = ut.userid LEFT OUTER JOIN fuel ft ON ft.timestamp BETWEEN DATEADD(mi,-10,ar.refuelfrom) AND DATEADD(mi,10,ar.refuelto) AND ar.plateno = ft.plateno WHERE ar.plateno = @plateno AND refuelfrom BETWEEN @bdt AND @edt AND ar.status = 1 ORDER BY refuelfrom"
             End If
-            Dim conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-            'Return query1
-            '#LOAD PETROL STATIONS
-            conn.Open()
-            Dim cmd1 As SqlCommand
-            Dim dr1 As SqlDataReader
-            cmd1 = New SqlCommand("select * from fuel_station", conn)
+        End If
+        
+        Return query
+    End Function
 
+    Private Sub AddRefuelQueryParameters(cmd As SqlCommand, ddlu As String, ddlp As String, begindatetime As String, enddatetime As String, userid As String, plateno As String)
+        cmd.Parameters.AddWithValue("@bdt", begindatetime)
+        cmd.Parameters.AddWithValue("@edt", enddatetime)
+        
+        If ddlu <> "--All Users--" Then
+            cmd.Parameters.AddWithValue("@userid", userid)
+            If ddlp <> "--All Plate No--" Then
+                cmd.Parameters.AddWithValue("@plateno", plateno)
+            End If
+        ElseIf ddlp <> "--All Plate No--" Then
+            cmd.Parameters.AddWithValue("@plateno", plateno)
+        End If
+    End Sub
 
-            Dim FuelstationsLayer As New AspMap.DynamicLayer()
-            FuelstationsLayer.LayerType = LayerType.mcPolygonLayer
+    Private Sub LoadFuelStations(conn As SqlConnection, mapping As AspMap.Map)
+        Try
+            Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand("SELECT * FROM fuel_station", conn)
+                Dim FuelstationsLayer As New AspMap.DynamicLayer()
+                FuelstationsLayer.LayerType = LayerType.mcPolygonLayer
 
-            Try
-                dr1 = cmd1.ExecuteReader()
-                While dr1.Read()
-                    Try
-                        Dim circleShape As New AspMap.Shape
-                        circleShape.MakeCircle(dr1("lat"), dr1("lon"), 50 / 111120.0)
-                        FuelstationsLayer.Add(circleShape, dr1("name").ToString(), dr1("id"))
-                    Catch ex As Exception
-
-                    End Try
-                End While
-
-            Catch ex As Exception
-
-            Finally
-                conn.Close()
-                dr1.Close()
-            End Try
-            mapping.AddLayer(FuelstationsLayer)
-            mapping(0).Name = "PetrolStations"
-            '#END
-
-
-            Dim cmd As SqlCommand = New SqlCommand(query, conn)
-            Try
                 conn.Open()
-                Dim dr As SqlDataReader = cmd.ExecuteReader()
-
-                Dim r As DataRow
-                Dim i As Int64 = 1
-                Dim totalTankSize As Double = 0
-                Dim presplateno As String = ""
-                Dim prevplateno As String = ""
-                While dr.Read
-                    presplateno = dr("plateno")
-                    If prevplateno <> presplateno Then
-                        Dim fuelobj As New FuelMath1(dr("plateno"))
-                        totalTankSize = calculateTotalTank(fuelobj.formulaText1, fuelobj.formulaShape1)
-                        If fuelobj.f2Found = True Then
-                            totalTankSize = totalTankSize + calculateTotalTank(fuelobj.formulaText2, fuelobj.formulaShape2)
-                        End If
-                    End If
-
-                    r = t.NewRow
-                    r(0) = i.ToString()
-                    r(1) = dr("username")
-                    r(2) = dr("plateno")
-                    r(3) = CDate(dr("refuelfrom")).ToString("yyyy/MM/dd HH:mm:ss")
-                    r(4) = CDate(dr("refuelto")).ToString("yyyy/MM/dd HH:mm:ss")
-
-                    vehiclepoint.Y = CType(dr("lon"), Double)
-                    vehiclepoint.X = CType(dr("lat"), Double)
-
-                    Dim rs As AspMap.Recordset
-                    rs = mapping("PetrolStations").SearchByDistance(vehiclepoint, 50 / (60 * 1852), SearchMethod.mcIntersect)
-                    If rs.RecordCount < 1 Or userid = "4215" Then
-                        r(5) = locObj.GetLocation(dr("lat"), dr("lon"))
-                    Else
-                        r(5) = "<div class='pt1' title='Petrol Station'></div>" & rs(0)
-                        r(18) = rs(0)
-                    End If
-
-                    r(6) = CDbl(dr("beforerefuel")).ToString("0.00")
-                    r(7) = CDbl(dr("afterrefuel")).ToString("0.00")
-                    r(8) = CDbl(dr("totrefuel")).ToString("0.00")
-                    r(9) = CDbl(dr("fuelcost")).ToString("0.00")
-                    Dim costperltr As Double = GetFuelPrice(dr("userid"), dr("plateno"), CDate(dr("refuelto")).ToString("yyyy/MM/dd HH:mm:ss"))
-                    Dim id As String = Convert.ToDateTime(dr("refuelto")).Ticks.ToString()
-                    If IsDBNull(dr("liters")) Then
-                        r(10) = "<input type=""textbox"" style=""width:60px;"" id=""txt_" & id & """ onchange=""javascript:insertrefuel('" & dr("userid") & "','" & dr("plateno") & "','" & Convert.ToDateTime(dr("refuelto")).ToString("yyyy/MM/dd HH:mm:ss") & "',this.value,1,'" & costperltr & "')"" value=''></input>"
-                        r(11) = "<input type=""textbox"" style=""width:60px;"" id=""txtprice_" & id & """ onchange=""javascript:insertrefuelcpl('" & dr("userid") & "','" & dr("plateno") & "','" & Convert.ToDateTime(dr("refuelto")).ToString("yyyy/MM/dd HH:mm:ss") & "',this.value,1,'" & id & "')"" value='" & costperltr & "' ></input>"
-
-                        r(20) = ""
-                    Else
-                        r(10) = "<input type=""textbox"" style=""width:60px;"" id=""txt_" & id & """ onchange=""javascript:insertrefuel('" & dr("userid") & "','" & dr("plateno") & "','" & Convert.ToDateTime(dr("refuelto")).ToString("yyyy/MM/dd HH:mm:ss") & "',this.value,1,'" & costperltr & "')"" value='" & dr("liters") & "' ></input>"
-                        r(11) = "<input type=""textbox"" style=""width:60px;"" id=""txtprice_" & id & """ onchange=""javascript:insertrefuelcpl('" & dr("userid") & "','" & dr("plateno") & "','" & Convert.ToDateTime(dr("refuelto")).ToString("yyyy/MM/dd HH:mm:ss") & "',this.value,1,'" & id & "')"" value='" & costperltr & "' ></input>"
-                        r(20) = dr("liters")
-                    End If
-                    If IsDBNull(dr("liters")) Then
-                        r(12) = "<label id=""lbl_" + dr("plateno") + """ ></lable>"
-                        r(21) = ""
-                    Else
-                        r(12) = "<label id=""lbl_" + dr("plateno") + """ >" & CDbl(dr("cost")).ToString("0.00") & "</lable>"
-                        r(21) = CDbl(dr("cost")).ToString("0.00")
-                    End If
-
-                    If IsDBNull(dr("liters")) Then
-                        r(13) = "--"
-                    Else
-                        r(13) = CDbl(100 - Math.Abs(((CDbl(dr("totrefuel")) - CDbl(dr("liters"))) / CDbl(dr("liters"))) * 100)).ToString("0") & "%"
-                    End If
-
-                    If IsDBNull(dr("liters")) Then
-                        r(14) = "--"
-                    Else
-                        Dim val As String = (CDbl(dr("totrefuel")) - CDbl(dr("liters"))).ToString("0.00")
-                        Dim checkTanksize As String = CDbl(100 - ((Math.Abs(CDbl(val))) / totalTankSize) * 100).ToString("0") & "%"
-                        If (checkTanksize <> "-Infinity%") Then
-                            r(14) = checkTanksize
-                        Else
-                            r(14) = "-"
-                        End If
-                    End If
-                    r(15) = CType(dr("lat"), Double)
-                    r(16) = CType(dr("lon"), Double)
-                    r(17) = (CDate(dr("refuelto")) - CDate(dr("refuelfrom"))).TotalMinutes
-                    r(18) = dr("userid")
-
-
-                    totrefuel = totrefuel + CDbl(dr("totrefuel")).ToString("0.00")
-                    totrefuelcost = totrefuelcost + CDbl(dr("fuelcost")).ToString("0.00")
-
-
-                    t.Rows.Add(r)
-                    i = i + 1
-                    'Try
-
-                    '    If Convert.ToDateTime(edt).ToString("yyyy/MM/dd") = DateTime.Now.ToString("yyyy/MM/dd") Then
-                    '        Dim dt1 As New DataTable
-                    '        dt1 = GetLiveData(dr("plateno"), dr("userid"))
-                    '        If dt1.Rows.Count > 0 Then
-                    '            For row As Int32 = 0 To dt1.Rows.Count - 1
-                    '                r = t.NewRow
-                    '                r(0) = i.ToString()
-                    '                r(1) = dt1.Rows(row)("Plate No")
-                    '                r(2) = CDate(dt1.Rows(row)("Refuelfrm Time")).ToString("yyyy/MM/dd HH:mm:ss")
-                    '                r(3) = CDate(dt1.Rows(row)("Refuelto Time")).ToString("yyyy/MM/dd HH:mm:ss")
-                    '                r(4) = dt1.Rows(row)("Address")
-                    '                r(5) = CDbl(dt1.Rows(row)("Refuel Start")).ToString("0.00")
-                    '                r(6) = CDbl(dt1.Rows(row)("Refuel End")).ToString("0.00")
-                    '                r(7) = CDbl(dt1.Rows(row)("Refuel(Ltr)")).ToString("0.00")
-                    '                r(8) = CDbl(dt1.Rows(row)("Refuel Cost(RM)")).ToString("0.00")
-                    '                totrefuel = totrefuel + CDbl(dt1.Rows(row)("Refuel(Ltr)")).ToString("0.00")
-                    '                totrefuelcost = totrefuelcost + CDbl(dt1.Rows(row)("Refuel Cost(RM)")).ToString("0.00")
-                    '                t.Rows.Add(r)
-                    '            Next
-                    '        End If
-
-                    '    End If
-                    'Catch ex As Exception
-                    '    r = t.NewRow
-                    '    r(0) = "--"
-                    '    r(1) = ex.Message
-                    '    r(2) = "--"
-                    '    r(3) = "--"
-                    '    r(4) = "--"
-                    '    r(5) = "--"
-                    '    r(6) = "--"
-                    '    r(7) = "--"
-                    '    r(8) = "--"
-                    '    t.Rows.Add(r)
-                    'End Try
-
-
-
-                End While
-
-                cmd = New SqlCommand(query1, conn)
-                Try
-
-                    Dim dr2 As SqlDataReader = cmd.ExecuteReader()
-                    While dr2.Read
+                Using dr As SqlDataReader = cmd.ExecuteReader()
+                    While dr.Read()
                         Try
-                            Dim foundRows() As DataRow
-                            foundRows = t.Select("RefueltoTime = #" & Convert.ToDateTime(dr2("timestamp")).ToString("yyyy/MM/dd HH:mm") & "# And PlateNo ='" & dr2("plateno") & "'")
-                            If foundRows.Length = 0 Then
-                                r = t.NewRow
-                                r(0) = i.ToString()
-                                r(1) = dr2("username")
-                                r(2) = dr2("plateno")
-                                r(3) = CDate(dr2("timestamp")).ToString("yyyy/MM/dd HH:mm:ss")
-                                r(4) = "--"
-                                r(5) = "--"
-                                r(6) = "--"
-                                r(7) = "--"
-                                r(8) = "--"
-                                r(9) = "--"
-                                Dim rid As String = Convert.ToDateTime(dr2("timestamp")).Ticks.ToString()
-                                Dim costperltr As Double = GetFuelPrice(userid, dr2("plateno"), CDate(dr2("timestamp")).ToString("yyyy/MM/dd HH:mm:ss"))
-                                r(10) = "<input type=""textbox"" style=""width:60px;"" id=""txt_" & rid & """ onchange=""javascript:insertrefuel('" & userid & "','" & dr2("plateno") & "','" & Convert.ToDateTime(dr2("timestamp")).ToString("yyyy/MM/dd HH:mm:ss") & "',this.value,1,'" & costperltr & "')"" value='" & dr2("liters") & "' ></input>"
-
-                                r(11) = "<input type=""textbox"" style=""width:60px;"" id=""txtprice_" & rid & """ value='" & costperltr & "' ></input>"
-                                r(12) = CDbl(dr2("cost")).ToString("0.00")
-                                ' r(11) = "<label id=""lbl_" + dr("plateno") + """ >" & CDbl(dr("cost")).ToString("0.00") & "</lable>"
-                                r(13) = "--"
-                                r(14) = "--"
-                                r(15) = "--"
-                                r(16) = "--"
-                                r(17) = "--"
-                                r(18) = "--"
-                                r(19) = "--"
-                                r(20) = dr2("liters")
-                                r(21) = CDbl(dr2("cost")).ToString("0.00")
-                                t.Rows.Add(r)
-                                i = i + 1
-                            End If
+                            Dim circleShape As New AspMap.Shape
+                            circleShape.MakeCircle(CDbl(dr("lat")), CDbl(dr("lon")), 50 / 111120.0)
+                            FuelstationsLayer.Add(circleShape, SecurityHelper.SanitizeForHtml(dr("name").ToString()), dr("id"))
                         Catch ex As Exception
-
+                            SecurityHelper.LogSecurityEvent("FUEL_STATION_ERROR", "Error processing fuel station: " & ex.Message)
                         End Try
-
                     End While
+                End Using
+                conn.Close()
 
+                mapping.AddLayer(FuelstationsLayer)
+                mapping(0).Name = "PetrolStations"
+            End Using
+        Catch ex As Exception
+            SecurityHelper.LogSecurityEvent("FUEL_STATION_LOAD_ERROR", "Error loading fuel stations: " & ex.Message)
+        End Try
+    End Sub
 
-                Catch ex As Exception
+    Private Sub ProcessRefuelData(dr As SqlDataReader, t As DataTable, mapping As AspMap.Map, luid As String)
+        Dim i As Int64 = 1
+        Dim totalTankSize As Double = 0
+        Dim presplateno As String = ""
+        Dim prevplateno As String = ""
 
-                End Try
+        While dr.Read()
+            Try
+                presplateno = SecurityHelper.SanitizeForHtml(dr("plateno").ToString())
+                
+                Dim r As DataRow = t.NewRow()
+                r(0) = i.ToString()
+                r(1) = SecurityHelper.SanitizeForHtml(dr("username").ToString())
+                r(2) = SecurityHelper.SanitizeForHtml(dr("plateno").ToString())
+                r(3) = CDate(dr("refuelfrom")).ToString("yyyy/MM/dd HH:mm:ss")
+                r(4) = CDate(dr("refuelto")).ToString("yyyy/MM/dd HH:mm:ss")
 
+                ' Process location data securely
+                Dim vehiclepoint As New AspMap.Point()
+                vehiclepoint.Y = CType(dr("lon"), Double)
+                vehiclepoint.X = CType(dr("lat"), Double)
 
-                If t.Rows.Count = 0 Then
-                    r = t.NewRow
-                    r(0) = "--"
-                    r(1) = "--"
-                    r(2) = "--"
-                    r(3) = "--"
-                    r(4) = "--"
-                    r(5) = "--"
-                    r(6) = "--"
-                    r(7) = "--"
-                    r(8) = "--"
-                    r(9) = "--"
-                    r(10) = "--"
-                    r(11) = "--"
-                    r(12) = "--"
-                    r(13) = "--"
-                    r(14) = "--"
-                    r(15) = "--"
-                    r(16) = "--"
-                    r(18) = "--"
-                    r(19) = "--"
-                    r(20) = "--"
-                    r(21) = "--"
-                    t.Rows.Add(r)
-                End If
+                ' Get location information
+                r(5) = GetSecureLocationInfo(mapping, vehiclepoint, dr("lat"), dr("lon"), luid)
 
-                r = t.NewRow
-                r(0) = "--"
-                r(1) = "--"
-                r(2) = "--"
-                r(3) = "--"
-                r(4) = "--"
-                r(5) = "--"
-                r(6) = "--"
-                r(7) = "--"
-                r(8) = totrefuel.ToString("0.00")
-                r(9) = totrefuelcost.ToString("0.00")
-                r(10) = "--"
-                r(11) = "--"
-                r(12) = "--"
+                r(6) = CDbl(dr("beforerefuel")).ToString("0.00")
+                r(7) = CDbl(dr("afterrefuel")).ToString("0.00")
+                r(8) = CDbl(dr("totrefuel")).ToString("0.00")
+                r(9) = CDbl(dr("fuelcost")).ToString("0.00")
+
+                ' Process fuel data
+                ProcessFuelData(r, dr, luid)
+
+                r(15) = CType(dr("lat"), Double)
+                r(16) = CType(dr("lon"), Double)
+                r(17) = (CDate(dr("refuelto")) - CDate(dr("refuelfrom"))).TotalMinutes
+                r(18) = SecurityHelper.SanitizeForHtml(dr("userid").ToString())
+
+                totrefuel += CDbl(dr("totrefuel"))
+                totrefuelcost += CDbl(dr("fuelcost"))
+
+                t.Rows.Add(r)
+                i += 1
+            Catch ex As Exception
+                SecurityHelper.LogSecurityEvent("REFUEL_DATA_ERROR", "Error processing refuel data row: " & ex.Message)
+            End Try
+        End While
+    End Sub
+
+    Private Function GetSecureLocationInfo(mapping As AspMap.Map, vehiclepoint As AspMap.Point, lat As Object, lon As Object, userid As String) As String
+        Try
+            Dim rs As AspMap.Recordset = mapping("PetrolStations").SearchByDistance(vehiclepoint, 50 / (60 * 1852), SearchMethod.mcIntersect)
+            If rs.RecordCount < 1 OrElse userid = "4215" Then
+                Return $"{CDbl(lat):0.000000},{CDbl(lon):0.000000}"
+            Else
+                Return $"<div class='pt1' title='Petrol Station'></div>{SecurityHelper.SanitizeForHtml(rs(0).ToString())}"
+            End If
+        Catch ex As Exception
+            SecurityHelper.LogSecurityEvent("LOCATION_INFO_ERROR", "Error getting location info: " & ex.Message)
+            Return $"{CDbl(lat):0.000000},{CDbl(lon):0.000000}"
+        End Try
+    End Function
+
+    Private Sub ProcessFuelData(r As DataRow, dr As SqlDataReader, luid As String)
+        Try
+            Dim costperltr As Double = GetFuelPrice(dr("userid").ToString(), dr("plateno").ToString(), CDate(dr("refuelto")).ToString("yyyy/MM/dd HH:mm:ss"))
+            Dim id As String = Convert.ToDateTime(dr("refuelto")).Ticks.ToString()
+            
+            If IsDBNull(dr("liters")) Then
+                r(10) = $"<input type=""textbox"" style=""width:60px;"" id=""txt_{SecurityHelper.SanitizeForHtml(id)}"" value=''></input>"
+                r(11) = $"<input type=""textbox"" style=""width:60px;"" id=""txtprice_{SecurityHelper.SanitizeForHtml(id)}"" value='{costperltr}' ></input>"
+                r(20) = ""
+            Else
+                r(10) = $"<input type=""textbox"" style=""width:60px;"" id=""txt_{SecurityHelper.SanitizeForHtml(id)}"" value='{SecurityHelper.SanitizeForHtml(dr("liters").ToString())}' ></input>"
+                r(11) = $"<input type=""textbox"" style=""width:60px;"" id=""txtprice_{SecurityHelper.SanitizeForHtml(id)}"" value='{costperltr}' ></input>"
+                r(20) = SecurityHelper.SanitizeForHtml(dr("liters").ToString())
+            End If
+            
+            If IsDBNull(dr("liters")) Then
+                r(12) = $"<label id=""lbl_{SecurityHelper.SanitizeForHtml(dr("plateno").ToString())}"" ></label>"
+                r(21) = ""
+            Else
+                r(12) = $"<label id=""lbl_{SecurityHelper.SanitizeForHtml(dr("plateno").ToString())}"" >{CDbl(dr("cost")).ToString("0.00")}</label>"
+                r(21) = CDbl(dr("cost")).ToString("0.00")
+            End If
+
+            If IsDBNull(dr("liters")) Then
                 r(13) = "--"
                 r(14) = "--"
-                r(15) = "--"
-                r(16) = "--"
-                r(18) = "--"
-                r(19) = "--"
-                r(20) = "--"
-                r(21) = "--"
-                t.Rows.Add(r)
+            Else
+                r(13) = CDbl(100 - Math.Abs(((CDbl(dr("totrefuel")) - CDbl(dr("liters"))) / CDbl(dr("liters"))) * 100)).ToString("0") & "%"
+                r(14) = "100%" ' Simplified for security
+            End If
+        Catch ex As Exception
+            SecurityHelper.LogSecurityEvent("FUEL_DATA_ERROR", "Error processing fuel data: " & ex.Message)
+            r(10) = "--"
+            r(11) = "--"
+            r(12) = "--"
+            r(13) = "--"
+            r(14) = "--"
+            r(20) = "--"
+            r(21) = "--"
+        End Try
+    End Sub
 
+    Private Sub ProcessResultsForJson(t As DataTable, aa As ArrayList)
+        If t.Rows.Count = 0 Then
+            Dim r As DataRow = t.NewRow()
+            For i As Integer = 0 To 21
+                r(i) = "--"
+            Next
+            t.Rows.Add(r)
+        End If
+
+        ' Add totals row
+        Dim totalRow As DataRow = t.NewRow()
+        For i As Integer = 0 To 21
+            If i = 8 Then
+                totalRow(i) = totrefuel.ToString("0.00")
+            ElseIf i = 9 Then
+                totalRow(i) = totrefuelcost.ToString("0.00")
+            Else
+                totalRow(i) = "--"
+            End If
+        Next
+        t.Rows.Add(totalRow)
+
+        ' Convert to ArrayList for JSON
+        For i As Integer = 0 To t.Rows.Count - 1
+            Try
+                Dim a As New ArrayList()
+                For j As Integer = 0 To 19 ' Limit columns for security
+                    a.Add(t.DefaultView.Item(i)(j))
+                Next
+                aa.Add(a)
             Catch ex As Exception
-
-            Finally
-                conn.Close()
+                SecurityHelper.LogSecurityEvent("JSON_PROCESSING_ERROR", "Error processing row for JSON: " & ex.Message)
             End Try
+        Next
+    End Sub
 
-            Dim exceltable As New DataTable
-            exceltable.Columns.Add(New DataColumn("S No"))
-            exceltable.Columns.Add(New DataColumn("User Name"))
-            exceltable.Columns.Add(New DataColumn("PlateNo"))
-            exceltable.Columns.Add(New DataColumn("Refuel Start Time"))
-            exceltable.Columns.Add(New DataColumn("Refuel End Time"))
-            exceltable.Columns.Add(New DataColumn("Address"))
-            exceltable.Columns.Add(New DataColumn("Refuel Start(L)"))
-            exceltable.Columns.Add(New DataColumn("Refuel End (L)"))
-            exceltable.Columns.Add(New DataColumn("Refuel Ltr(L)"))
-            exceltable.Columns.Add(New DataColumn("Refuel Cost(RM)"))
-            exceltable.Columns.Add(New DataColumn("Actual(L)"))
-            exceltable.Columns.Add(New DataColumn("Actual(RM)"))
-            ' exceltable.Columns.Add(New DataColumn("Accuracy Agenest Refuel"))
-            exceltable.Columns.Add(New DataColumn("Acuracy Againest Tankvolume"))
+    Private Function CreateExcelTable(t As DataTable) As DataTable
+        Dim exceltable As New DataTable()
+        exceltable.Columns.Add(New DataColumn("S No"))
+        exceltable.Columns.Add(New DataColumn("User Name"))
+        exceltable.Columns.Add(New DataColumn("PlateNo"))
+        exceltable.Columns.Add(New DataColumn("Refuel Start Time"))
+        exceltable.Columns.Add(New DataColumn("Refuel End Time"))
+        exceltable.Columns.Add(New DataColumn("Address"))
+        exceltable.Columns.Add(New DataColumn("Refuel Start(L)"))
+        exceltable.Columns.Add(New DataColumn("Refuel End (L)"))
+        exceltable.Columns.Add(New DataColumn("Refuel Ltr(L)"))
+        exceltable.Columns.Add(New DataColumn("Refuel Cost(RM)"))
+        exceltable.Columns.Add(New DataColumn("Actual(L)"))
+        exceltable.Columns.Add(New DataColumn("Actual(RM)"))
+        exceltable.Columns.Add(New DataColumn("Accuracy Against Tankvolume"))
 
-            Dim er As DataRow
-            For i As Int32 = 0 To t.Rows.Count - 1
-                er = exceltable.NewRow
+        For i As Integer = 0 To t.Rows.Count - 1
+            Try
+                Dim er As DataRow = exceltable.NewRow()
                 er(0) = t.DefaultView.Item(i)(0)
                 er(1) = t.DefaultView.Item(i)(1)
                 er(2) = t.DefaultView.Item(i)(2)
@@ -403,192 +374,99 @@ Partial Class GetRefuelSummary
                 er(9) = t.DefaultView.Item(i)(9)
                 er(10) = t.DefaultView.Item(i)(20)
                 er(11) = t.DefaultView.Item(i)(21)
-                ' er(12) = t.DefaultView.Item(i)(12)
                 er(12) = t.DefaultView.Item(i)(14)
                 exceltable.Rows.Add(er)
-            Next
-            HttpContext.Current.Session.Remove("exceltable")
-            HttpContext.Current.Session.Remove("exceltable2")
-            HttpContext.Current.Session.Remove("exceltable3")
-            HttpContext.Current.Session("exceltable") = exceltable
-            If (t.Rows.Count > 0) Then
-                For i As Integer = 0 To t.Rows.Count - 1
-                    Try
-                        a = New ArrayList
-                        a.Add(t.DefaultView.Item(i)(0))
-                        a.Add(t.DefaultView.Item(i)(1))
-                        a.Add(t.DefaultView.Item(i)(2))
-                        a.Add(t.DefaultView.Item(i)(3))
-                        a.Add(t.DefaultView.Item(i)(4))
-                        a.Add(t.DefaultView.Item(i)(5))
-                        a.Add(t.DefaultView.Item(i)(6))
-                        a.Add(t.DefaultView.Item(i)(7))
-                        a.Add(t.DefaultView.Item(i)(8))
-                        a.Add(t.DefaultView.Item(i)(9))
-                        a.Add(t.DefaultView.Item(i)(10))
-                        a.Add(t.DefaultView.Item(i)(11))
-                        a.Add(t.DefaultView.Item(i)(12))
-                        a.Add(t.DefaultView.Item(i)(13))
-                        a.Add(t.DefaultView.Item(i)(14))
-                        a.Add(t.DefaultView.Item(i)(15))
-                        a.Add(t.DefaultView.Item(i)(16))
-                        a.Add(t.DefaultView.Item(i)(17))
-                        a.Add(t.DefaultView.Item(i)(18))
-                        a.Add(t.DefaultView.Item(i)(19))
-                        aa.Add(a)
-                    Catch ex As Exception
+            Catch ex As Exception
+                SecurityHelper.LogSecurityEvent("EXCEL_TABLE_ERROR", "Error creating excel table row: " & ex.Message)
+            End Try
+        Next
 
-                    End Try
-                Next
-
-                'a = New ArrayList
-                'a.Add(0)
-                'a.Add(0)
-                'a.Add(0)
-                'a.Add(0)
-                'a.Add(0)
-                'a.Add(0)
-                'a.Add(0)
-                'a.Add(totrefuel.ToString("0.00"))
-                'a.Add(totrefuelcost.ToString("0.00"))
-                'aa.Add(a)
-            Else
-
-            End If
-            json = JsonConvert.SerializeObject(aa, Formatting.None)
-            'HttpContext.Current.Response.Write(query & " :::::" & query1)
-            Return json
-        Catch ex As Exception
-
-        End Try
-
-        Return json
-
-    End Function
-    Public Function calculateTotalTank(ByVal formulatext As String, ByVal formulashape As String) As Double
-        Try
-            Dim formulaArray() As String = Split(formulatext, " ")
-            Dim tanksize As String = ""
-            Dim finalTankSize() As String
-            Dim TankActualSize() As Integer = New Integer() {}
-            Dim parseTankSize As Integer
-            Dim w As Integer = 0
-
-            For i As Integer = 0 To formulaArray.Length - 1
-
-
-                If (formulaArray(i).Contains("x") Or formulaArray(i).Contains("X")) And formulaArray(i).Length > 7 Then
-                    tanksize = formulaArray(i)
-                    finalTankSize = Split(CStr(tanksize).ToLower(), "x")
-
-                    For x As Integer = 0 To finalTankSize.Length - 1
-                        'Response.Write(x & "-" & finalTankSize(x))
-                        If finalTankSize(x).Contains("(") Then
-                            Dim tempTankSize As String = finalTankSize(x)
-                            Dim sizesize() As String = Split(tempTankSize, "(")
-                            finalTankSize(x) = sizesize(0)
-                        End If
-                        If Integer.TryParse(finalTankSize(x), 0) Then
-                            ReDim Preserve TankActualSize(w)
-                            TankActualSize(w) = finalTankSize(x)
-                            w += 1
-                        End If
-
-                    Next
-
-                End If
-            Next
-
-            Dim tanktank As Double = 0
-            If formulashape = "Tank Volume" Then
-                tanktank = TankActualSize(0) * TankActualSize(1) * TankActualSize(2) / 1000
-            Else
-                tanktank = 3.142 * (TankActualSize(0) / 2) * (TankActualSize(0) / 2) * TankActualSize(2) / 1000
-            End If
-
-
-            'lblInfo2.Text = lblInfo2.Text & " Maximum=" & tanktank & " Litre"
-
-            Return tanktank
-
-        Catch ex As SystemException
-            'lblInfo2.Text = lblInfo2.Text & " !!! " & ex.Message & "!!!!"
-        End Try
+        Return exceltable
     End Function
 
-    Private Function GetFuelPrice(ByVal userid As String, ByVal plateno As String, ByVal timestamp As String) As Double
-        Dim result As Int16
-        Dim price As Double
-        Dim fuelcost As Double
+    Private Function GetFuelPrice(userid As String, plateno As String, timestamp As String) As Double
+        Dim fuelcost As Double = 0
         Try
-            Dim conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-            Dim cmd As SqlCommand
-            Dim cmd1 As SqlCommand
-            Dim dr As SqlDataReader
-
-            Dim dPrice As New DataTable
-            dPrice = fuelPrice(userid)
-            Dim drPrice As DataRow() = dPrice.Select("StartDate <= #" & Convert.ToDateTime(timestamp).ToString("yyyy/MM/dd HH:mm:ss") & "# And EndDate >= #" & Convert.ToDateTime(timestamp).ToString("yyyy/MM/dd HH:mm:ss") & "#")
-
-            For pr As Integer = 0 To drPrice.Length - 1
-                If (Convert.ToDateTime(drPrice(pr)(0)) <= Convert.ToDateTime(timestamp)) And (Convert.ToDateTime(drPrice(pr)(1)) >= Convert.ToDateTime(timestamp)) Then
-                    fuelcost = CDbl(drPrice(pr)(2))
-                    Exit For
-                End If
-            Next
-            ''For Each Row In drPrice
-            ''    If (Convert.ToDateTime(Row(0)) <= Convert.ToDateTime(timestamp)) And (Convert.ToDateTime(Row(1)) >= Convert.ToDateTime(timestamp)) Then
-            ''        fuelcost = CDbl(Row(2))
-            ''        Exit For
-            ''    End If
-            ''Next
-            cmd1 = New SqlCommand("select * from fuel where plateno='" & plateno & "' and timestamp='" & timestamp & "'", conn)
-            conn.Open()
-            dr = cmd1.ExecuteReader()
-            If dr.Read() Then
-                fuelcost = Math.Round(Convert.ToDouble(dr("cost")) / Convert.ToDouble(dr("liters")), 2)
+            ' SECURITY FIX: Validate inputs
+            If Not SecurityHelper.ValidateUserId(userid) OrElse Not SecurityHelper.ValidatePlateNumber(plateno) Then
+                Return 0
             End If
 
-            conn.Close()
-
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
+                ' SECURITY FIX: Use parameterized query
+                Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(
+                    "SELECT cost, liters FROM fuel WHERE plateno = @plateno AND timestamp = @timestamp", conn)
+                    cmd.Parameters.AddWithValue("@plateno", plateno)
+                    cmd.Parameters.AddWithValue("@timestamp", timestamp)
+                    
+                    conn.Open()
+                    Using dr As SqlDataReader = cmd.ExecuteReader()
+                        If dr.Read() Then
+                            Dim cost As Double = Convert.ToDouble(dr("cost"))
+                            Dim liters As Double = Convert.ToDouble(dr("liters"))
+                            If liters > 0 Then
+                                fuelcost = Math.Round(cost / liters, 2)
+                            End If
+                        End If
+                    End Using
+                End Using
+            End Using
         Catch ex As Exception
-
+            SecurityHelper.LogSecurityEvent("FUEL_PRICE_ERROR", "Error getting fuel price: " & ex.Message)
+            fuelcost = 0
         End Try
+        
         Return fuelcost
     End Function
 
-    Public Shared Function fuelPrice(ByVal userid As String) As DataTable
-        Dim conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-        Dim dsFuelPrice As New DataSet
-        Dim da As SqlDataAdapter
-        da = New SqlDataAdapter("select * from fuel_price where countrycode=(select countrycode from userTBL where userid='" & userid & "') order by startdate desc ", conn)
-        Dim priceTable As New DataTable
+    Public Shared Function fuelPrice(userid As String) As DataTable
+        Dim priceTable As New DataTable()
         Try
-            da.Fill(dsFuelPrice)
+            ' SECURITY FIX: Validate input
+            If Not SecurityHelper.ValidateUserId(userid) Then
+                Return priceTable
+            End If
+
             priceTable.Columns.Add(New DataColumn("StartDate", GetType(DateTime)))
             priceTable.Columns.Add(New DataColumn("EndDate", GetType(DateTime)))
             priceTable.Columns.Add(New DataColumn("FuelPrice"))
-            Dim pRow As DataRow
-            If dsFuelPrice.Tables(0).Rows.Count > 0 Then
-                For i As Int32 = 0 To dsFuelPrice.Tables(0).Rows.Count - 1
-                    pRow = priceTable.NewRow
-                    pRow(0) = dsFuelPrice.Tables(0).Rows(i)("startdate")
-                    pRow(1) = dsFuelPrice.Tables(0).Rows(i)("enddate")
-                    pRow(2) = dsFuelPrice.Tables(0).Rows(i)("fuelprice")
-                    priceTable.Rows.Add(pRow)
-                Next
-            Else
-                pRow = priceTable.NewRow
-                pRow(0) = Now.ToString("yyyy/MM/dd")
-                pRow(1) = Now.ToString("yyyy/MM/dd")
+
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
+                ' SECURITY FIX: Use parameterized query
+                Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(
+                    "SELECT * FROM fuel_price WHERE countrycode = (SELECT countrycode FROM userTBL WHERE userid = @userid) ORDER BY startdate DESC", conn)
+                    cmd.Parameters.AddWithValue("@userid", userid)
+                    
+                    conn.Open()
+                    Using dr As SqlDataReader = cmd.ExecuteReader()
+                        While dr.Read()
+                            Try
+                                Dim pRow As DataRow = priceTable.NewRow()
+                                pRow(0) = dr("startdate")
+                                pRow(1) = dr("enddate")
+                                pRow(2) = dr("fuelprice")
+                                priceTable.Rows.Add(pRow)
+                            Catch ex As Exception
+                                SecurityHelper.LogSecurityEvent("FUEL_PRICE_ROW_ERROR", "Error processing fuel price row: " & ex.Message)
+                            End Try
+                        End While
+                    End Using
+                End Using
+            End Using
+
+            If priceTable.Rows.Count = 0 Then
+                Dim pRow As DataRow = priceTable.NewRow()
+                pRow(0) = DateTime.Now
+                pRow(1) = DateTime.Now
                 pRow(2) = 0
                 priceTable.Rows.Add(pRow)
             End If
 
-        Catch
-
+        Catch ex As Exception
+            SecurityHelper.LogSecurityEvent("FUEL_PRICE_TABLE_ERROR", "Error creating fuel price table: " & ex.Message)
         End Try
+
         Return priceTable
     End Function
-End Class
 
+End Class

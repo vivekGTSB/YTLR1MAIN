@@ -1,108 +1,133 @@
-﻿Imports System.Data.SqlClient
+Imports System.Data.SqlClient
 Imports Newtonsoft.Json
 Imports System.Collections
+
 Partial Class GetPollData
-    Inherits System.Web.UI.Page
+    Inherits SecurePageBase
 
     Protected Sub Page_Load(sender As Object, e As System.EventArgs) Handles Me.Load
-        Dim plateno As String = Request.QueryString("plateno")
-        If plateno <> "" Then
-            plateno = plateno.Trim()
-        End If
-        Dim aa As New ArrayList
-        Dim a As ArrayList
-        Dim inboxLess As Boolean = False
-        Dim t As New DataTable
-
-        t.Columns.Add(New DataColumn("DateTime"))
-        t.Columns.Add(New DataColumn("Message"))
-        t.Columns.Add(New DataColumn("MobileNo"))
-        t.Columns.Add(New DataColumn("Status"))
-
-        ' plateno = "CP0005"
-        Dim edt As DateTime = Now.ToString("yyyy/MM/dd HH:mm:ss")
-        Dim bdt As DateTime = edt.AddHours(-24).ToString("yyyy/MM/dd HH:mm:ss")
-        Dim conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-
-        Dim cmd As New SqlCommand
-
-        Dim drI As SqlDataReader
-        Dim dro As SqlDataReader
-
-        Dim condition As String = ""
-        Dim r As DataRow
-        Dim ii As Integer = 0
-        cmd.Connection = conn
-        condition = "and datetime between '" & bdt.ToString("yyyy/MM/dd HH:mm:ss") & "' and '" & edt.ToString("yyyy/MM/dd HH:mm:ss") & "'"
-        cmd.CommandText = "select datetime, message,mobileno from sms_inbox where plateno='" & plateno & "' " & condition & " order by datetime  "
         Try
-            conn.Open()
-            drI = cmd.ExecuteReader()
-            While drI.Read()
-                r = t.NewRow()
-                r(0) = DateTime.Parse(drI("datetime")).ToString("yyyy/MM/dd HH:mm:ss")
-                r(1) = drI("message")
-                r(2) = drI("mobileno")
-                r(3) = 0
-                t.Rows.Add(r)
-            End While
-
-        Catch ex As Exception
-            Response.Write(ex.Message)
-        Finally
-            conn.Close()
-            drI.Close()
-        End Try
-
-        
-        cmd.CommandText = "select datetime, message,mobileno from sms_outbox where plateno='" & plateno & "' " & condition & " order by datetime "
-        Try
-            conn.Open()
-            dro = cmd.ExecuteReader()
-            While dro.Read()
-                r = t.NewRow()
-                r(0) = DateTime.Parse(dro("datetime")).ToString("yyyy/MM/dd HH:mm:ss")
-                r(1) = dro("message")
-                r(2) = dro("mobileno")
-                r(3) = 1
-                t.Rows.Add(r)
-            End While
-
-        Catch ex As Exception
-            Response.Write(ex.Message)
-        Finally
-            conn.Close()
-            dro.Close()
-        End Try
-
-        Dim message As String = ""
-        For c As Integer = 0 To t.Rows.Count - 1
-            a = New ArrayList()
-            a.Add(c + 1)
-            a.Add(t.DefaultView.Item(c)(0))
-            a.Add(t.DefaultView.Item(c)(2))
-            message = t.DefaultView.Item(c)(1)
-            If message.StartsWith("CGUS") Then
-                message = "Sent Polling Command"
+            ' SECURITY FIX: Validate authentication
+            If Not AuthenticationHelper.IsUserAuthenticated() Then
+                Response.StatusCode = 401
+                Response.Write("{""error"":""Unauthorized""}")
+                Response.End()
+                Return
             End If
-            a.Add(message)
 
-            a.Add(t.DefaultView.Item(c)(3))
-            aa.Add(a)
-        Next
-        If t.Rows.Count = 0 Then
-            a = New ArrayList()
-            a.Add("--")
-            a.Add("--")
-            a.Add("--")
-            a.Add("--")
-            aa.Add(a)
-        End If
-        Dim jss As New Newtonsoft.Json.JsonSerializer()
-        Dim json As String = ""
-        json = "{""aaData"":" & JsonConvert.SerializeObject(aa, Formatting.None) & "}"
-        Response.Write(json)
-        Response.ContentType = "text/plain"
+            ' SECURITY FIX: Validate and sanitize input
+            Dim plateno As String = SecurityHelper.SanitizeForHtml(Request.QueryString("plateno"))
+            If String.IsNullOrEmpty(plateno) Then
+                Response.StatusCode = 400
+                Response.Write("{""error"":""Invalid plate number""}")
+                Response.End()
+                Return
+            End If
 
+            ' SECURITY FIX: Validate plate number format
+            If Not SecurityHelper.ValidatePlateNumber(plateno) Then
+                Response.StatusCode = 400
+                Response.Write("{""error"":""Invalid plate number format""}")
+                Response.End()
+                Return
+            End If
+
+            plateno = plateno.Trim()
+            Dim aa As New ArrayList()
+            Dim t As New DataTable()
+
+            t.Columns.Add(New DataColumn("DateTime"))
+            t.Columns.Add(New DataColumn("Message"))
+            t.Columns.Add(New DataColumn("MobileNo"))
+            t.Columns.Add(New DataColumn("Status"))
+
+            ' SECURITY FIX: Validate date range
+            Dim edt As DateTime = DateTime.Now
+            Dim bdt As DateTime = edt.AddHours(-24)
+
+            Try
+                Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
+                    ' SECURITY FIX: Use parameterized queries for inbox data
+                    Dim cmd As SqlCommand = SecurityHelper.CreateSafeCommand(
+                        "SELECT datetime, message, mobileno FROM sms_inbox WHERE plateno = @plateno AND datetime BETWEEN @bdt AND @edt ORDER BY datetime",
+                        conn)
+                    cmd.Parameters.AddWithValue("@plateno", plateno)
+                    cmd.Parameters.AddWithValue("@bdt", bdt.ToString("yyyy/MM/dd HH:mm:ss"))
+                    cmd.Parameters.AddWithValue("@edt", edt.ToString("yyyy/MM/dd HH:mm:ss"))
+
+                    conn.Open()
+                    Using dr As SqlDataReader = cmd.ExecuteReader()
+                        While dr.Read()
+                            Dim r As DataRow = t.NewRow()
+                            r(0) = DateTime.Parse(dr("datetime").ToString()).ToString("yyyy/MM/dd HH:mm:ss")
+                            r(1) = SecurityHelper.SanitizeForHtml(dr("message").ToString())
+                            r(2) = SecurityHelper.SanitizeForHtml(dr("mobileno").ToString())
+                            r(3) = 0
+                            t.Rows.Add(r)
+                        End While
+                    End Using
+
+                    ' SECURITY FIX: Use parameterized queries for outbox data
+                    cmd = SecurityHelper.CreateSafeCommand(
+                        "SELECT datetime, message, mobileno FROM sms_outbox WHERE plateno = @plateno AND datetime BETWEEN @bdt AND @edt ORDER BY datetime",
+                        conn)
+                    cmd.Parameters.AddWithValue("@plateno", plateno)
+                    cmd.Parameters.AddWithValue("@bdt", bdt.ToString("yyyy/MM/dd HH:mm:ss"))
+                    cmd.Parameters.AddWithValue("@edt", edt.ToString("yyyy/MM/dd HH:mm:ss"))
+
+                    Using dr As SqlDataReader = cmd.ExecuteReader()
+                        While dr.Read()
+                            Dim r As DataRow = t.NewRow()
+                            r(0) = DateTime.Parse(dr("datetime").ToString()).ToString("yyyy/MM/dd HH:mm:ss")
+                            r(1) = SecurityHelper.SanitizeForHtml(dr("message").ToString())
+                            r(2) = SecurityHelper.SanitizeForHtml(dr("mobileno").ToString())
+                            r(3) = 1
+                            t.Rows.Add(r)
+                        End While
+                    End Using
+                End Using
+
+                ' Process results
+                For c As Integer = 0 To t.Rows.Count - 1
+                    Dim a As New ArrayList()
+                    a.Add(c + 1)
+                    a.Add(t.DefaultView.Item(c)(0))
+                    a.Add(t.DefaultView.Item(c)(2))
+                    
+                    Dim message As String = t.DefaultView.Item(c)(1).ToString()
+                    If message.StartsWith("CGUS") Then
+                        message = "Sent Polling Command"
+                    End If
+                    a.Add(message)
+                    a.Add(t.DefaultView.Item(c)(3))
+                    aa.Add(a)
+                Next
+
+                If t.Rows.Count = 0 Then
+                    Dim a As New ArrayList()
+                    a.Add("--")
+                    a.Add("--")
+                    a.Add("--")
+                    a.Add("--")
+                    aa.Add(a)
+                End If
+
+                ' SECURITY FIX: Safe JSON response
+                Dim json As String = "{""aaData"":" & JsonConvert.SerializeObject(aa, Formatting.None) & "}"
+                Response.ContentType = "application/json"
+                Response.Write(json)
+
+            Catch ex As Exception
+                SecurityHelper.LogSecurityEvent("DATABASE_ERROR", "Error in GetPollData: " & ex.Message)
+                Response.StatusCode = 500
+                Response.Write("{""error"":""Database error""}")
+            End Try
+
+        Catch ex As Exception
+            SecurityHelper.LogSecurityEvent("GENERAL_ERROR", "Error in GetPollData: " & ex.Message)
+            Response.StatusCode = 500
+            Response.Write("{""error"":""Internal server error""}")
+        End Try
     End Sub
+
 End Class
