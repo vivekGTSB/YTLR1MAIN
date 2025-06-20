@@ -1,0 +1,1 @@
+﻿<%@ Page Language="vb" AutoEventWireup="false" CodeBehind="GetOssData.aspx.vb" Inherits="YTLWebApplication.GetOssData" %>
