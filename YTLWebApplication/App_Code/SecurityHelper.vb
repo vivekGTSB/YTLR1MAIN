@@ -35,6 +35,21 @@ Public Class SecurityHelper
     End Function
     
     ' SECURITY FIX: Input validation methods
+    Public Shared Function ValidateInput(input As String, pattern As String) As Boolean
+        If String.IsNullOrEmpty(input) Then
+            Return False
+        End If
+        
+        If Not String.IsNullOrEmpty(pattern) Then
+            Dim regex As New Regex(pattern)
+            If Not regex.IsMatch(input) Then
+                Return False
+            End If
+        End If
+        
+        Return True
+    End Function
+    
     Public Shared Function ValidateInput(input As String, maxLength As Integer, allowedPattern As String) As Boolean
         If String.IsNullOrEmpty(input) Then
             Return False
@@ -55,6 +70,11 @@ Public Class SecurityHelper
     End Function
     
     ' SECURITY FIX: SQL parameter helper
+    Public Shared Function CreateSafeCommand(sql As String, connection As SqlConnection) As SqlCommand
+        Dim cmd As New SqlCommand(sql, connection)
+        Return cmd
+    End Function
+    
     Public Shared Function CreateSqlParameter(parameterName As String, value As Object, sqlDbType As SqlDbType) As SqlParameter
         Dim parameter As New SqlParameter(parameterName, sqlDbType)
         parameter.Value = If(value, DBNull.Value)
@@ -261,7 +281,7 @@ Public Class SecurityHelper
     End Function
     
     ' SECURITY FIX: Rate limiting helpers
-    Public Shared Function IsRateLimited(identifier As String, maxRequests As Integer, timeWindowMinutes As Integer) As Boolean
+    Public Shared Function CheckRateLimit(identifier As String, maxRequests As Integer, timeWindow As TimeSpan) As Boolean
         Try
             Dim cacheKey As String = $"RateLimit_{identifier}"
             Dim requestCount As Integer = 0
@@ -271,15 +291,15 @@ Public Class SecurityHelper
             End If
             
             If requestCount = 0 Then
-                HttpContext.Current.Cache.Insert(cacheKey, 1, Nothing, DateTime.Now.AddMinutes(timeWindowMinutes), TimeSpan.Zero)
-                Return False
+                HttpContext.Current.Cache.Insert(cacheKey, 1, Nothing, DateTime.Now.Add(timeWindow), TimeSpan.Zero)
+                Return True
             Else
                 requestCount += 1
-                HttpContext.Current.Cache.Insert(cacheKey, requestCount, Nothing, DateTime.Now.AddMinutes(timeWindowMinutes), TimeSpan.Zero)
-                Return requestCount > maxRequests
+                HttpContext.Current.Cache.Insert(cacheKey, requestCount, Nothing, DateTime.Now.Add(timeWindow), TimeSpan.Zero)
+                Return requestCount <= maxRequests
             End If
         Catch
-            Return False
+            Return True ' Default to allowing the request if rate limiting fails
         End Try
     End Function
     
@@ -319,4 +339,50 @@ Public Class SecurityHelper
         End Try
     End Function
     
+    ' SECURITY FIX: Session validation
+    Public Shared Function ValidateSession() As Boolean
+        Try
+            If HttpContext.Current.Session Is Nothing Then
+                Return False
+            End If
+            
+            ' Check if user is authenticated
+            If HttpContext.Current.Session("userid") Is Nothing Then
+                Return False
+            End If
+            
+            ' Check session timeout
+            If HttpContext.Current.Session("logintime") IsNot Nothing Then
+                Dim loginTime As DateTime = CDate(HttpContext.Current.Session("logintime"))
+                If DateTime.Now.Subtract(loginTime).TotalMinutes > 30 Then ' 30 minute timeout
+                    HttpContext.Current.Session.Clear()
+                    Return False
+                End If
+            End If
+            
+            Return True
+        Catch ex As Exception
+            Return False
+        End Try
+    End Function
+    
+    ' SECURITY FIX: Password hashing
+    Public Shared Function HashPassword(password As String) As String
+        Using sha256 As SHA256 = SHA256.Create()
+            Dim hashedBytes As Byte() = sha256.ComputeHash(Encoding.UTF8.GetBytes(password))
+            Return BitConverter.ToString(hashedBytes).Replace("-", "").ToLower()
+        End Using
+    End Function
+End Class
+
+Public Class SecurityException
+    Inherits Exception
+    
+    Public Sub New(message As String)
+        MyBase.New(message)
+    End Sub
+    
+    Public Sub New(message As String, innerException As Exception)
+        MyBase.New(message, innerException)
+    End Sub
 End Class

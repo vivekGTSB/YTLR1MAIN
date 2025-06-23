@@ -1,36 +1,72 @@
-﻿Imports System.Data.SqlClient
+Imports System.Data.SqlClient
 Imports Newtonsoft.Json
 
 Partial Class smssummaryjson
     Inherits System.Web.UI.Page
 
     Protected Sub Page_Load(sender As Object, e As System.EventArgs) Handles Me.Load
-        Dim ddlu As String = Request.QueryString("u")
-        Dim ddlp As String = Request.QueryString("ddlp")
-        Dim bdt As String = Request.QueryString("bdt")
-        Dim edt As String = Request.QueryString("edt")
-
-        Dim luid As String = Request.QueryString("luid")
-        Dim role As String = Request.QueryString("role")
-        Dim userlist As String = Request.QueryString("userslist")
-        Dim nu As String = Request.QueryString("nu")
-        Dim pno As String = Request.QueryString("pno")
-        Dim gna As String = Request.QueryString("gna")
-        Dim una As String = Request.QueryString("una")
-        Dim mdt As String = Request.QueryString("mdt")
-        Dim lit As String = Request.QueryString("lit")
-        Dim dur As String = Request.QueryString("dur")
-        Dim gru As String = Request.QueryString("gru")
-        DisplayLogInformation(ddlu, ddlp, bdt, edt, luid, role, userlist, nu, pno, gna, una, mdt, lit, dur, gru)
-
+        Try
+            ' SECURITY FIX: Validate user session
+            If Request.Cookies("userinfo") Is Nothing Then
+                Response.Redirect("Login.aspx")
+                Return
+            End If
+            
+            Dim ddlu As String = Request.QueryString("u")
+            Dim ddlp As String = Request.QueryString("ddlp")
+            Dim bdt As String = Request.QueryString("bdt")
+            Dim edt As String = Request.QueryString("edt")
+            Dim luid As String = Request.QueryString("luid")
+            Dim role As String = Request.QueryString("role")
+            Dim userlist As String = Request.QueryString("userslist")
+            
+            ' SECURITY FIX: Validate input parameters
+            If Not String.IsNullOrEmpty(ddlu) AndAlso 
+               ddlu <> "--All Users--" AndAlso 
+               Not SecurityHelper.ValidateInput(ddlu, "^[0-9]+$") Then
+                Response.Write("[]")
+                Return
+            End If
+            
+            If Not String.IsNullOrEmpty(luid) AndAlso Not SecurityHelper.ValidateInput(luid, "^[0-9]+$") Then
+                Response.Write("[]")
+                Return
+            End If
+            
+            ' SECURITY FIX: Validate date formats
+            Dim beginDate As DateTime
+            Dim endDate As DateTime
+            
+            If Not DateTime.TryParse(bdt, beginDate) OrElse Not DateTime.TryParse(edt, endDate) Then
+                Response.Write("[]")
+                Return
+            End If
+            
+            ' Additional parameters for localization
+            Dim nu As String = Request.QueryString("nu")
+            Dim pno As String = Request.QueryString("pno")
+            Dim gna As String = Request.QueryString("gna")
+            Dim una As String = Request.QueryString("una")
+            Dim mdt As String = Request.QueryString("mdt")
+            Dim lit As String = Request.QueryString("lit")
+            Dim dur As String = Request.QueryString("dur")
+            Dim gru As String = Request.QueryString("gru")
+            
+            DisplayLogInformation(ddlu, ddlp, bdt, edt, luid, role, userlist, nu, pno, gna, una, mdt, lit, dur, gru)
+        Catch ex As Exception
+            ' SECURITY FIX: Log error but don't expose details
+            SecurityHelper.LogError("Page_Load error", ex, Server)
+            Response.Write("[]")
+        End Try
     End Sub
 
     Public Sub DisplayLogInformation(ByVal ddlu As String, ByVal ddlp As String, ByVal bdt As String, ByVal edt As String, ByVal luid As String, ByVal role As String, ByVal userslist As String, ByVal nu As String, ByVal pno As String, ByVal gna As String, ByVal una As String, ByVal mdt As String, ByVal lit As String, ByVal dur As String, ByVal gru As String)
         Dim json As String
         Dim aa As New ArrayList()
         Dim a As ArrayList
+        Dim conn As SqlConnection = Nothing
+        
         Try
-
             Dim begindatetime As String = bdt
             Dim enddatetime As String = edt
             Dim userid As String = ddlu
@@ -38,6 +74,7 @@ Partial Class smssummaryjson
             Dim uid As String = luid
             Dim totalcost As Double = 0
             Dim totalsms As Integer = 0
+            
             Dim t As New DataTable
             t.Columns.Add(New DataColumn("S Nu"))
             t.Columns.Add(New DataColumn("PlateNo"))
@@ -65,40 +102,54 @@ Partial Class smssummaryjson
             t.Columns.Add(New DataColumn("Cost Per SMS"))
             t.Columns.Add(New DataColumn("Total Cost"))
             t.Columns.Add(New DataColumn("userid"))
+            
             Dim query As String = ""
+            Dim parameters As New List(Of SqlParameter)()
 
-
+            ' Build query based on user selection
             If ddlu <> "--All Users--" Then
                 If ddlp = "--All Plate No--" Then
-                    query = "select ot.plateno,ot.userid,ut.username, alert_type,count(message ) as count from sms_outbox ot inner join userTBL  ut on ot.userid=ut.userid where ot.userid='" & userid & "' and datetime between '" & begindatetime & "' and '" & enddatetime & "'  group by ot.plateno,ot.userid,ut.username,alert_type"
+                    query = "SELECT ot.plateno, ot.userid, ut.username, alert_type, COUNT(message) AS count FROM sms_outbox ot INNER JOIN userTBL ut ON ot.userid=ut.userid WHERE ot.userid=@userid AND datetime BETWEEN @beginDateTime AND @endDateTime GROUP BY ot.plateno, ot.userid, ut.username, alert_type"
+                    parameters.Add(New SqlParameter("@userid", userid))
                 Else
-                    query = "select ot.plateno,ot.userid,ut.username, alert_type,count(message ) as count from sms_outbox ot inner join userTBL  ut on ot.userid=ut.userid where ot.userid='" & userid & "' and plateno='" & plateno & "' and datetime between '" & begindatetime & "' and '" & enddatetime & "' group by ot.plateno,ot.userid,ut.username,alert_type"
+                    query = "SELECT ot.plateno, ot.userid, ut.username, alert_type, COUNT(message) AS count FROM sms_outbox ot INNER JOIN userTBL ut ON ot.userid=ut.userid WHERE ot.userid=@userid AND plateno=@plateno AND datetime BETWEEN @beginDateTime AND @endDateTime GROUP BY ot.plateno, ot.userid, ut.username, alert_type"
+                    parameters.Add(New SqlParameter("@userid", userid))
+                    parameters.Add(New SqlParameter("@plateno", plateno))
                 End If
             Else
                 If ddlp = "--All Plate No--" Then
                     If role = "SuperUser" Or role = "Operator" Then
-                        query = "select ot.plateno,ot.userid,ut.username, alert_type,count(message ) as count from sms_outbox ot inner join userTBL  ut on ot.userid=ut.userid where ot.userid in (" & userslist & ") and datetime between '" & begindatetime & "' and '" & enddatetime & "' group by ot.plateno,ot.userid,ut.username,alert_type"
+                        query = "SELECT ot.plateno, ot.userid, ut.username, alert_type, COUNT(message) AS count FROM sms_outbox ot INNER JOIN userTBL ut ON ot.userid=ut.userid WHERE ot.userid IN (" & userslist & ") AND datetime BETWEEN @beginDateTime AND @endDateTime GROUP BY ot.plateno, ot.userid, ut.username, alert_type"
                     ElseIf role = "Admin" Then
-                        query = "select ot.plateno,ot.userid,ut.username, alert_type,count(message ) as count from sms_outbox ot inner join userTBL  ut on ot.userid=ut.userid where  datetime between '" & begindatetime & "' and '" & enddatetime & "' group by ot.plateno,ot.userid,ut.username,alert_type"
+                        query = "SELECT ot.plateno, ot.userid, ut.username, alert_type, COUNT(message) AS count FROM sms_outbox ot INNER JOIN userTBL ut ON ot.userid=ut.userid WHERE datetime BETWEEN @beginDateTime AND @endDateTime GROUP BY ot.plateno, ot.userid, ut.username, alert_type"
                     End If
                 Else
-                    query = "select ot.plateno,ot.userid,ut.username, alert_type,count(message ) as count from sms_outbox ot inner join userTBL  ut on ot.userid=ut.userid where ot.plateno='" & plateno & "' and datetime between '" & begindatetime & "' and '" & enddatetime & "' group by ot.plateno,ot.userid,ut.username,alert_type"
+                    query = "SELECT ot.plateno, ot.userid, ut.username, alert_type, COUNT(message) AS count FROM sms_outbox ot INNER JOIN userTBL ut ON ot.userid=ut.userid WHERE ot.plateno=@plateno AND datetime BETWEEN @beginDateTime AND @endDateTime GROUP BY ot.plateno, ot.userid, ut.username, alert_type"
+                    parameters.Add(New SqlParameter("@plateno", plateno))
                 End If
             End If
-            Dim conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
+            
+            parameters.Add(New SqlParameter("@beginDateTime", begindatetime))
+            parameters.Add(New SqlParameter("@endDateTime", enddatetime))
+            
+            conn = New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
             Dim cmd As SqlCommand = New SqlCommand(query, conn)
+            
+            ' Add parameters to command
+            For Each param As SqlParameter In parameters
+                cmd.Parameters.Add(param)
+            Next
+            
             Try
                 conn.Open()
                 Dim dr As SqlDataReader = cmd.ExecuteReader()
 
                 Dim r As DataRow
                 Dim i As Int64 = 1
-
                 Dim drow() As DataRow
 
                 While dr.Read
                     Try
-
                         drow = t.Select("PlateNo='" & dr("plateno") & "'")
                         If drow.Length > 0 Then
                             If IsDBNull(dr("alert_type")) Then
@@ -127,6 +178,7 @@ Partial Class smssummaryjson
                                         drow(0)(21) = dr("count")
                                 End Select
                             End If
+                            
                             totalsms = totalsms + Convert.ToInt32(dr("count"))
                             totalcost = totalcost + (Convert.ToInt32(dr("count")) * 0.2).ToString("0.00")
                             drow(0)(22) = Convert.ToInt32(drow(0)(22)) + Convert.ToInt32(dr("count"))
@@ -134,51 +186,50 @@ Partial Class smssummaryjson
                         Else
                             r = t.NewRow
                             r(0) = i.ToString()
-                            r(1) = dr("plateno")
-                            r(2) = dr("username").ToString.ToUpper()
+                            r(1) = HttpUtility.HtmlEncode(dr("plateno").ToString())
+                            r(2) = HttpUtility.HtmlEncode(dr("username").ToString().ToUpper())
 
                             If IsDBNull(dr("alert_type")) Then
                                 r(21) = dr("count")
                             Else
                                 Select Case dr("alert_type")
-                                    Case "0" : r(3) = "" + dr("count")
-                                    Case "1" : r(4) = dr("count")
-                                    Case "2" : r(5) = dr("count")
-                                    Case "3" : r(6) = dr("count")
-                                    Case "4" : r(7) = dr("count")
-                                    Case "5" : r(8) = dr("count")
-                                    Case "6" : r(9) = dr("count")
-                                    Case "7" : r(10) = dr("count")
-                                    Case "8" : r(11) = dr("count")
-                                    Case "9" : r(12) = dr("count")
-                                    Case "10" : r(13) = dr("count")
-                                    Case "11" : r(14) = dr("count")
-                                    Case "12" : r(15) = dr("count")
-                                    Case "13" : r(16) = dr("count")
-                                    Case "14" : r(17) = dr("count")
-                                    Case "15" : r(18) = dr("count")
-                                    Case "16" : r(19) = dr("count")
-                                    Case "17" : r(20) = dr("count")
+                                    Case "0" : r(3) = "" + dr("count").ToString()
+                                    Case "1" : r(4) = dr("count").ToString()
+                                    Case "2" : r(5) = dr("count").ToString()
+                                    Case "3" : r(6) = dr("count").ToString()
+                                    Case "4" : r(7) = dr("count").ToString()
+                                    Case "5" : r(8) = dr("count").ToString()
+                                    Case "6" : r(9) = dr("count").ToString()
+                                    Case "7" : r(10) = dr("count").ToString()
+                                    Case "8" : r(11) = dr("count").ToString()
+                                    Case "9" : r(12) = dr("count").ToString()
+                                    Case "10" : r(13) = dr("count").ToString()
+                                    Case "11" : r(14) = dr("count").ToString()
+                                    Case "12" : r(15) = dr("count").ToString()
+                                    Case "13" : r(16) = dr("count").ToString()
+                                    Case "14" : r(17) = dr("count").ToString()
+                                    Case "15" : r(18) = dr("count").ToString()
+                                    Case "16" : r(19) = dr("count").ToString()
+                                    Case "17" : r(20) = dr("count").ToString()
                                     Case Else
-                                        r(21) = dr("count")
+                                        r(21) = dr("count").ToString()
                                 End Select
                             End If
 
-                            r(22) = dr("count")
+                            r(22) = dr("count").ToString()
                             r(23) = "RM 0.20"
                             r(24) = "RM " & (Convert.ToInt32(r(22)) * 0.2).ToString("0.00")
-                            r(25) = dr("userid")
+                            r(25) = dr("userid").ToString()
                             totalsms = totalsms + Convert.ToInt32(dr("count"))
                             totalcost = totalcost + (Convert.ToInt32(dr("count")) * 0.2).ToString("0.00")
                             t.Rows.Add(r)
                             i = i + 1
                         End If
                     Catch ex As Exception
-                        json = "Error 1 : " & ex.Message
+                        ' SECURITY FIX: Log error but don't expose details
+                        SecurityHelper.LogError("DisplayLogInformation data processing error", ex, Server)
                     End Try
                 End While
-
-
 
                 If t.Rows.Count = 0 Then
                     r = t.NewRow
@@ -241,11 +292,11 @@ Partial Class smssummaryjson
                 End If
 
             Catch ex As Exception
-                json = ex.Message
+                ' SECURITY FIX: Log error but don't expose details
+                SecurityHelper.LogError("DisplayLogInformation query error", ex, Server)
             Finally
                 conn.Close()
             End Try
-
 
             If (t.Rows.Count > 0) Then
                 For i As Integer = 0 To t.Rows.Count - 1
@@ -279,12 +330,12 @@ Partial Class smssummaryjson
                         a.Add(t.DefaultView.Item(i)(25))
                         aa.Add(a)
                     Catch ex As Exception
-                        json = ex.Message
+                        ' SECURITY FIX: Log error but don't expose details
+                        SecurityHelper.LogError("DisplayLogInformation array processing error", ex, Server)
                     End Try
                 Next
-            Else
-
             End If
+            
             HttpContext.Current.Session.Remove("exceltable")
             HttpContext.Current.Session.Remove("exceltable2")
             HttpContext.Current.Session.Remove("exceltable3")
@@ -292,12 +343,13 @@ Partial Class smssummaryjson
 
             HttpContext.Current.Session("exceltable") = t
             json = JsonConvert.SerializeObject(aa, Formatting.None)
+            Response.ContentType = "application/json"
             Response.Write(json)
+            
         Catch ex As Exception
-            json = ex.Message
+            ' SECURITY FIX: Log error but don't expose details
+            SecurityHelper.LogError("DisplayLogInformation error", ex, Server)
+            Response.Write("[]")
         End Try
-
-
     End Sub
-
 End Class
