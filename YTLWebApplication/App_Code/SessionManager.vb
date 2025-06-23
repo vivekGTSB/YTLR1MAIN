@@ -170,7 +170,7 @@ Public Class SessionManager
     ' Log session activities
     Private Shared Sub LogSessionActivity(activity As String, userId As String, sessionToken As String)
         Try
-            Dim logMessage As String = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {activity} - User: {userId} - Token: {sessionToken.Substring(0, 8)}... - IP: {HttpContext.Current.Request.UserHostAddress}"
+            Dim logMessage As String = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {activity} - User: {userId} - Token: {sessionToken.Substring(0, Math.Min(8, sessionToken.Length))}... - IP: {HttpContext.Current.Request.UserHostAddress}"
             SecurityHelper.LogSecurityEvent(logMessage)
         Catch
             ' Fail silently

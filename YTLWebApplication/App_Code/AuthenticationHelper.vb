@@ -19,7 +19,7 @@ Public Class AuthenticationHelper
         
         Try
             Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
-                Dim query As String = "SELECT userid, password, role, userslist FROM userTBL WHERE username = @username AND active = 1"
+                Dim query As String = "SELECT userid, password, role, userslist, password_hash FROM userTBL WHERE username = @username AND active = 1"
                 Using cmd As SqlCommand = SecurityHelper.CreateSafeCommand(query, conn)
                     cmd.Parameters.AddWithValue("@username", username)
                     
@@ -27,9 +27,23 @@ Public Class AuthenticationHelper
                     Using dr As SqlDataReader = cmd.ExecuteReader()
                         If dr.Read() Then
                             Dim storedPassword As String = dr("password").ToString()
-                            Dim hashedPassword As String = SecurityHelper.HashPassword(password)
+                            Dim passwordHash As String = If(IsDBNull(dr("password_hash")), "", dr("password_hash").ToString())
+                            Dim isValidPassword As Boolean = False
                             
-                            If storedPassword = hashedPassword Then
+                            If Not String.IsNullOrEmpty(passwordHash) Then
+                                ' Use new secure password verification
+                                isValidPassword = SecurityHelper.VerifyPassword(password, passwordHash)
+                            Else
+                                ' Fallback to old password system (for migration)
+                                isValidPassword = String.Equals(password, storedPassword, StringComparison.OrdinalIgnoreCase)
+                                
+                                ' If old password is valid, upgrade to new hash
+                                If isValidPassword Then
+                                    UpgradePasswordHash(dr("userid").ToString(), password)
+                                End If
+                            End If
+                            
+                            If isValidPassword Then
                                 ' Create secure session
                                 CreateSecureSession(dr("userid").ToString(), username, dr("role").ToString(), dr("userslist").ToString())
                                 SecurityHelper.LogSecurityEvent("SUCCESSFUL_LOGIN", "User logged in successfully", username)
@@ -47,12 +61,30 @@ Public Class AuthenticationHelper
         Return False
     End Function
     
+    Private Shared Sub UpgradePasswordHash(userId As String, password As String)
+        Try
+            Dim hashedPassword As String = SecurityHelper.HashPassword(password)
+            Using conn As New SqlConnection(System.Configuration.ConfigurationManager.AppSettings("sqlserverconnection"))
+                Dim query As String = "UPDATE userTBL SET password_hash = @passwordHash WHERE userid = @userId"
+                Using cmd As New SqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@userId", userId)
+                    cmd.Parameters.AddWithValue("@passwordHash", hashedPassword)
+                    
+                    conn.Open()
+                    cmd.ExecuteNonQuery()
+                End Using
+            End Using
+        Catch ex As Exception
+            SecurityHelper.LogSecurityEvent("PASSWORD_UPGRADE_ERROR", "Failed to upgrade password hash: " & ex.Message)
+        End Try
+    End Sub
+    
     Private Shared Sub CreateSecureSession(userId As String, username As String, role As String, usersList As String)
         ' Clear any existing session
         HttpContext.Current.Session.Clear()
         
         ' Set session values
-        HttpContext.Current.Session("userid") = userId
+        HttpContext.Current.Session("userId") = userId
         HttpContext.Current.Session("username") = username
         HttpContext.Current.Session("role") = role
         HttpContext.Current.Session("userslist") = usersList

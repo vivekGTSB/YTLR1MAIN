@@ -64,7 +64,7 @@ Public Class PasswordHelper
     ' Constant-time comparison to prevent timing attacks
     Private Shared Function SlowEquals(a() As Byte, b() As Byte) As Boolean
         Dim diff As UInteger = CUInt(a.Length) Xor CUInt(b.Length)
-        For i As Integer = 0 To a.Length - 1 And b.Length - 1
+        For i As Integer = 0 To Math.Min(a.Length, b.Length) - 1
             diff = diff Or (CUInt(a(i)) Xor CUInt(b(i)))
         Next
         Return diff = 0

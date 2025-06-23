@@ -22,28 +22,45 @@ Namespace AVLS
 
         Private Sub Page_Load(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles MyBase.Load
             Try
+                ' Log the logout event
+                SecurityHelper.LogSecurityEvent("User logout initiated")
+                
+                ' Clear session securely
+                SessionManager.DestroySession("User logout")
+                
+                ' Clear cookies securely
                 If (Not Request.Cookies("userinfo") Is Nothing) Then
-                    Dim myCookie As HttpCookie
-                    myCookie = New HttpCookie("userinfo")
-                    myCookie.Expires = DateTime.Now.AddDays(-1D)
-                    Response.Cookies.Add(myCookie)
+                    Dim userinfoCookie As New HttpCookie("userinfo")
+                    userinfoCookie.Expires = DateTime.Now.AddDays(-1D)
+                    userinfoCookie.HttpOnly = True
+                    userinfoCookie.Secure = True
+                    Response.Cookies.Add(userinfoCookie)
                 End If
-                Session.Clear()
+                
                 If (Not Request.Cookies("accesslevel") Is Nothing) Then
-                    Dim myCookie As HttpCookie
-                    myCookie = New HttpCookie("accesslevel")
-                    myCookie.Expires = DateTime.Now.AddDays(-1D)
-                    Response.Cookies.Add(myCookie)
+                    Dim accessCookie As New HttpCookie("accesslevel")
+                    accessCookie.Expires = DateTime.Now.AddDays(-1D)
+                    accessCookie.HttpOnly = True
+                    accessCookie.Secure = True
+                    Response.Cookies.Add(accessCookie)
                 End If
+                
+                ' Clear all cookies
+                Response.Cookies.Clear()
+                
+                ' Sign out from forms authentication
+                FormsAuthentication.SignOut()
+                
             Catch ex As Exception
+                SecurityHelper.LogSecurityEvent("Logout error: " & ex.Message)
                 Session.Clear()
                 Response.Cookies.Clear()
-                Response.Cookies.Remove("userinfo")
             End Try
-            Response.Redirect("login.aspx")
+            
+            ' Redirect to login page
+            Response.Redirect("login.aspx", True)
         End Sub
 
     End Class
 
 End Namespace
-

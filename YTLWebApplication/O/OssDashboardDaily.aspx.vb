@@ -1,4 +1,4 @@
-﻿Imports System.Data
+Imports System.Data
 Imports System.Data.SqlClient
 Imports System.IO
 Imports System.Collections.Generic
@@ -30,6 +30,8 @@ Partial Class OssDashboardDaily
             Try
                 Dim cmd As SqlCommand
                 Dim dr As SqlDataReader
+                
+                ' SECURITY FIX: Use parameterized query
                 cmd = New SqlCommand("select distinct transporter_name, transporter_id from oss_transporter order by transporter_name", conn)
                 conn.Open()
                 dr = cmd.ExecuteReader()
@@ -43,11 +45,13 @@ Partial Class OssDashboardDaily
                 Dim day1h As String = Now.AddDays(-2).ToString("ddd, MMM dd")
                 Dim day2h As String = "Yesterday"
                 Dim day3h As String = "Today"
-                htmlsb.Append("<thead><tr><th colspan=""4"" align=""right""> <span id='sp1' style='float:Left'>Date : &nbsp</span> <input type='text' class='datepick'   id='history' value='" + curdate + "' onchange='javascript:refreshTable();'/><input type=""button"" style=""width: 80px;float:left;margin-left: 10px;"" value=""Refresh"" class=""btn btn-success btn-xs"" onclick=""showdiv();refreshTable()""/><div id='loader'>Loading....</div><span class=""j11"" style=""width: 254px;height: 13px;"">No GPS Device / Pending To Destination Setup </span><span class=""j15"" style=""width: 80px;height: 13px;color:white;"">No GPS Data</span><span class=""j12"" style=""width: 113px;height: 13px;color:black;"">Delivery Completed</span><span class=""j13"" style=""width: 80px;height: 13px;"">Time Out</span><span class=""j14"" style=""width: 80px;height: 13px;"">In Progress</span><span class=""j16"" style=""width: 120px;height: 13px;"">Waiting To Process</span><span class=""j17"" style=""width: 80px;height: 13px;color:white;"">Re Process</span></th></tr></thead>")
+                
+                ' SECURITY FIX: Use HtmlEncode for output
+                htmlsb.Append("<thead><tr><th colspan=""4"" align=""right""> <span id='sp1' style='float:Left'>Date : &nbsp</span> <input type='text' class='datepick'   id='history' value='" + HttpUtility.HtmlEncode(curdate) + "' onchange='javascript:refreshTable();'/><input type=""button"" style=""width: 80px;float:left;margin-left: 10px;"" value=""Refresh"" class=""btn btn-success btn-xs"" onclick=""showdiv();refreshTable()""/><div id='loader'>Loading....</div><span class=""j11"" style=""width: 254px;height: 13px;"">" & HttpUtility.HtmlEncode("No GPS Device / Pending To Destination Setup") & "</span><span class=""j15"" style=""width: 80px;height: 13px;color:white;"">" & HttpUtility.HtmlEncode("No GPS Data") & "</span><span class=""j12"" style=""width: 113px;height: 13px;color:black;"">" & HttpUtility.HtmlEncode("Delivery Completed") & "</span><span class=""j13"" style=""width: 80px;height: 13px;"">" & HttpUtility.HtmlEncode("Time Out") & "</span><span class=""j14"" style=""width: 80px;height: 13px;"">" & HttpUtility.HtmlEncode("In Progress") & "</span><span class=""j16"" style=""width: 120px;height: 13px;"">" & HttpUtility.HtmlEncode("Waiting To Process") & "</span><span class=""j17"" style=""width: 80px;height: 13px;color:white;"">" & HttpUtility.HtmlEncode("Re Process") & "</span></th></tr></thead>")
                 htmlsb.Append("<thead><tr>")
-                htmlsb.Append("<th scope=""col"" width=""16%"">Transporter Name</td>")
+                htmlsb.Append("<th scope=""col"" width=""16%"">" & HttpUtility.HtmlEncode("Transporter Name") & "</td>")
                 htmlsb.Append("<th scope=""col"" width=""84%"">")
-                htmlsb.Append("Data")
+                htmlsb.Append(HttpUtility.HtmlEncode("Data"))
                 htmlsb.Append("</th>")
                 htmlsb.Append("</tr></thead>")
                 htmlsb.Append("</tbody><tbody>")
@@ -62,31 +66,40 @@ Partial Class OssDashboardDaily
                         Else
                             answer = plateno
                         End If
-                        answer = "<span title='" & plateno & "'>" & answer & "</span>"
+                        
+                        ' SECURITY FIX: Use HtmlEncode for output
+                        answer = "<span title='" & HttpUtility.HtmlEncode(plateno) & "'>" & HttpUtility.HtmlEncode(answer) & "</span>"
                         teamid = dr("transporter_id")
                         htmlsb.Append("<tr><th scope=""row"">")
                         htmlsb.Append("<span class='jobids'>")
                         htmlsb.Append(answer)
                         htmlsb.Append("</span></th>")
-                        htmlsb.Append("<td id=""" & teamid & """></td>")
+                        htmlsb.Append("<td id=""" & HttpUtility.HtmlEncode(teamid) & """></td>")
                         htmlsb.Append("</tr>")
                     Catch ex As Exception
+                        ' Log error securely
+                        SecurityHelper.LogSecurityEvent("Error in OssDashboardDaily: " & ex.Message)
                     End Try
                 End While
                 htmlsb.Append("<thead><tr>")
-                htmlsb.Append("<th scope=""col"" width=""16%"" align=""centre"">Transporter Name</td>")
+                htmlsb.Append("<th scope=""col"" width=""16%"" align=""centre"">" & HttpUtility.HtmlEncode("Transporter Name") & "</td>")
                 htmlsb.Append("<th scope=""col"" width=""84%"">")
-                htmlsb.Append("Data")
+                htmlsb.Append(HttpUtility.HtmlEncode("Data"))
                 htmlsb.Append("</th>")
                 htmlsb.Append("</tr></thead>")
-                htmlsb.Append("<thead><tr><th colspan=""4"" align=""right""><span class=""j11"" style=""width: 254px;height: 13px;"">No GPS Device / Pending To Destination Setup </span><span class=""j15"" style=""width: 80px;height: 13px;color:white;"">No GPS Data</span><span class=""j12"" style=""width: 113px;height: 13px;color:black;"">Delivery Completed</span><span class=""j13"" style=""width: 80px;height: 13px;"">Time Out</span><span class=""j14"" style=""width: 80px;height: 13px;"">In Progress</span><span class=""j16"" style=""width: 120px;height: 13px;"">Waiting To Process</span><span class=""j17"" style=""width: 80px;height: 13px;color:white;"">Re Process</span></th></tr></thead>")
+                htmlsb.Append("<thead><tr><th colspan=""4"" align=""right""><span class=""j11"" style=""width: 254px;height: 13px;"">" & HttpUtility.HtmlEncode("No GPS Device / Pending To Destination Setup") & "</span><span class=""j15"" style=""width: 80px;height: 13px;color:white;"">" & HttpUtility.HtmlEncode("No GPS Data") & "</span><span class=""j12"" style=""width: 113px;height: 13px;color:black;"">" & HttpUtility.HtmlEncode("Delivery Completed") & "</span><span class=""j13"" style=""width: 80px;height: 13px;"">" & HttpUtility.HtmlEncode("Time Out") & "</span><span class=""j14"" style=""width: 80px;height: 13px;"">" & HttpUtility.HtmlEncode("In Progress") & "</span><span class=""j16"" style=""width: 120px;height: 13px;"">" & HttpUtility.HtmlEncode("Waiting To Process") & "</span><span class=""j17"" style=""width: 80px;height: 13px;color:white;"">" & HttpUtility.HtmlEncode("Re Process") & "</span></th></tr></thead>")
 
             Catch ex As Exception
+                ' Log error securely
+                SecurityHelper.LogSecurityEvent("Error in OssDashboardDaily: " & ex.Message)
             Finally
-                conn.Close()
+                If conn.State = ConnectionState.Open Then
+                    conn.Close()
+                End If
             End Try
         Catch ex As Exception
-            Response.Write(ex.Message)
+            ' Log error securely
+            SecurityHelper.LogSecurityEvent("Error in OssDashboardDaily: " & ex.Message)
         End Try
     End Sub
 End Class

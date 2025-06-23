@@ -12,11 +12,13 @@ Public Class SecurityHelper
     Public Shared Function ValidateUserSession(request As HttpRequest, session As HttpSessionState) As Boolean
         Return SessionManager.ValidateSession()
     End Function
+    
     Public Shared Function CreateSecureCommand(query As String, connection As SqlConnection) As SqlCommand
         Dim cmd As New SqlCommand(query, connection)
         cmd.CommandTimeout = 30
         Return cmd
     End Function
+    
     Public Shared Function SanitizeForHtml(input As String) As String
         If String.IsNullOrEmpty(input) Then
             Return String.Empty
@@ -24,6 +26,7 @@ Public Class SecurityHelper
 
         Return HttpUtility.HtmlEncode(input)
     End Function
+    
     ' JavaScript encode for embedding in JavaScript
     Public Shared Function SanitizeForJavaScript(input As String) As String
         If String.IsNullOrEmpty(input) Then
@@ -39,6 +42,7 @@ Public Class SecurityHelper
                    .Replace("<", "\u003c") _
                    .Replace(">", "\u003e")
     End Function
+    
     ' Comprehensive input validation
     Public Shared Function ValidateInput(input As String, maxLength As Integer, Optional allowedPattern As String = Nothing) As Boolean
         If String.IsNullOrEmpty(input) Then
@@ -66,6 +70,10 @@ Public Class SecurityHelper
 
     ' Detect dangerous patterns including SQL injection, XSS, and command injection
     Public Shared Function ContainsDangerousPatterns(input As String) As Boolean
+        If String.IsNullOrEmpty(input) Then
+            Return False
+        End If
+        
         Dim dangerousPatterns() As String = {
             "(\%27)|(\')|(\-\-)|(\%23)|(#)",
             "((\%3D)|(=))[^\n]*((\%27)|(\')|(\-\-)|(\%3B)|(;))",
@@ -99,7 +107,7 @@ Public Class SecurityHelper
 
         For Each pattern As String In dangerousPatterns
             If Regex.IsMatch(input, pattern, RegexOptions.IgnoreCase) Then
-                LogSecurityEvent($"Dangerous pattern detected: {pattern} in input: {input.Substring(0, Math.Min(50, input.Length))}")
+                LogSecurityEvent("DANGEROUS_PATTERN_DETECTED", $"Dangerous pattern detected: {pattern} in input: {input.Substring(0, Math.Min(50, input.Length))}")
                 Return True
             End If
         Next
@@ -124,8 +132,8 @@ Public Class SecurityHelper
         Dim encoded As String = HttpUtility.HtmlEncode(input)
 
         ' Second pass - additional encoding for potential bypasses
-        encoded = encoded.Replace("&#x", "&amp;#x")
-        encoded = encoded.Replace("&#", "&amp;#")
+        encoded = encoded.Replace("&#x", "&#x")
+        encoded = encoded.Replace("&#", "&#")
 
         Return encoded
     End Function
@@ -418,7 +426,8 @@ Public Class SecurityHelper
             New Byte() {&H4D, &H5A}, ' MZ (PE executable)
             New Byte() {&H50, &H4B}, ' PK (ZIP/Office documents - could contain macros)
             New Byte() {&H7F, &H45, &H4C, &H46} ' ELF executable
-}
+        }
+        
         For Each Signature In dangerousSignatures
             If fileContent.Take(Signature.Length).SequenceEqual(Signature) Then
                 Return True
@@ -427,6 +436,7 @@ Public Class SecurityHelper
 
         Return False
     End Function
+    
     Public Shared Function HasRequiredRole(requiredRole As String) As Boolean
         Try
             Dim userRole As String = GetCurrentUserRole()
@@ -447,20 +457,22 @@ Public Class SecurityHelper
                     Return False
             End Select
         Catch ex As Exception
-            LogSecurityEvent("ROLE_CHECK_ERROR", ex.Message)
+            LogSecurityEvent("ROLE_CHECK_ERROR: " & ex.Message)
             Return False
         End Try
     End Function
+    
     Public Shared Function GenerateCSRFToken() As String
         Try
             Dim token As String = Guid.NewGuid().ToString()
             HttpContext.Current.Session("CSRFToken") = token
             Return token
         Catch ex As Exception
-            LogSecurityEvent("CSRF_TOKEN_GENERATION_ERROR", ex.Message)
+            LogSecurityEvent("CSRF_TOKEN_GENERATION_ERROR: " & ex.Message)
             Return String.Empty
         End Try
     End Function
+    
     ' Validate CSRF token
     Public Shared Function ValidateCSRFToken(submittedToken As String) As Boolean
         Try
@@ -475,10 +487,11 @@ Public Class SecurityHelper
 
             Return sessionToken.Equals(submittedToken, StringComparison.Ordinal)
         Catch ex As Exception
-            LogSecurityEvent("CSRF_TOKEN_VALIDATION_ERROR", ex.Message)
+            LogSecurityEvent("CSRF_TOKEN_VALIDATION_ERROR: " & ex.Message)
             Return False
         End Try
     End Function
+    
     ' Rate limiting check
     Public Shared Function CheckRateLimit(key As String, maxAttempts As Integer, timeWindow As TimeSpan) As Boolean
         Try
@@ -498,10 +511,11 @@ Public Class SecurityHelper
 
             Return True
         Catch ex As Exception
-            LogSecurityEvent("RATE_LIMIT_ERROR", ex.Message)
+            LogSecurityEvent("RATE_LIMIT_ERROR: " & ex.Message)
             Return True ' Allow on error to prevent blocking legitimate users
         End Try
     End Function
+    
     ' Validate users list format
     Public Shared Function ValidateUsersList(usersList As String) As Boolean
         Try
@@ -529,8 +543,89 @@ Public Class SecurityHelper
 
             Return True
         Catch ex As Exception
-            LogSecurityEvent("USERS_LIST_VALIDATION_ERROR", ex.Message)
+            LogSecurityEvent("USERS_LIST_VALIDATION_ERROR: " & ex.Message)
             Return False
         End Try
+    End Function
+    
+    ' Get current user role from session
+    Private Shared Function GetCurrentUserRole() As String
+        Try
+            If HttpContext.Current IsNot Nothing AndAlso HttpContext.Current.Session IsNot Nothing Then
+                If HttpContext.Current.Session("role") IsNot Nothing Then
+                    Return HttpContext.Current.Session("role").ToString()
+                End If
+            End If
+            Return String.Empty
+        Catch ex As Exception
+            LogSecurityEvent("GET_ROLE_ERROR: " & ex.Message)
+            Return String.Empty
+        End Try
+    End Function
+    
+    ' Hash password with salt
+    Public Shared Function HashPassword(password As String) As String
+        Try
+            ' Generate salt
+            Dim salt(31) As Byte
+            Using rng As New RNGCryptoServiceProvider()
+                rng.GetBytes(salt)
+            End Using
+            
+            ' Hash password with salt
+            Using pbkdf2 As New Rfc2898DeriveBytes(password, salt, 10000)
+                Dim hash() As Byte = pbkdf2.GetBytes(32)
+                
+                ' Combine salt and hash
+                Dim hashBytes(63) As Byte
+                Array.Copy(salt, 0, hashBytes, 0, 32)
+                Array.Copy(hash, 0, hashBytes, 32, 32)
+                
+                Return Convert.ToBase64String(hashBytes)
+            End Using
+        Catch ex As Exception
+            LogSecurityEvent("PASSWORD_HASH_ERROR: " & ex.Message)
+            Throw New CryptographicException("Password hashing failed", ex)
+        End Try
+    End Function
+    
+    ' Verify password against hash
+    Public Shared Function VerifyPassword(password As String, hashedPassword As String) As Boolean
+        Try
+            ' Extract salt and hash from stored password
+            Dim hashBytes() As Byte = Convert.FromBase64String(hashedPassword)
+            
+            If hashBytes.Length <> 64 Then
+                Return False
+            End If
+            
+            ' Extract salt
+            Dim salt(31) As Byte
+            Array.Copy(hashBytes, 0, salt, 0, 32)
+            
+            ' Extract hash
+            Dim storedHash(31) As Byte
+            Array.Copy(hashBytes, 32, storedHash, 0, 32)
+            
+            ' Hash the provided password with the extracted salt
+            Using pbkdf2 As New Rfc2898DeriveBytes(password, salt, 10000)
+                Dim testHash() As Byte = pbkdf2.GetBytes(32)
+                
+                ' Compare hashes
+                Return SlowEquals(storedHash, testHash)
+            End Using
+        Catch ex As Exception
+            LogSecurityEvent("PASSWORD_VERIFY_ERROR: " & ex.Message)
+            Return False
+        End Try
+    End Function
+    
+    ' Constant-time comparison to prevent timing attacks
+    Private Shared Function SlowEquals(a() As Byte, b() As Byte) As Boolean
+        Dim diff As UInteger = CUInt(a.Length) Xor CUInt(b.Length)
+        For i As Integer = 0 To Math.Min(a.Length, b.Length) - 1
+            diff = diff Or (CUInt(a(i)) Xor CUInt(b(i)))
+        Next
+        Return diff = 0
     End Function
 End Class

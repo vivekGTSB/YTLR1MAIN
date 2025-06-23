@@ -57,7 +57,7 @@ Public Class FileUploadHelper
         ' Save file
         fileUpload.SaveAs(fullPath)
         
-        SecurityHelper.LogSecurityEvent("FILE_UPLOAD", "File uploaded: " & fileName)
+        SecurityHelper.LogSecurityEvent("FILE_UPLOAD: File uploaded: " & fileName)
         
         Return fileName
     End Function
