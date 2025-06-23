@@ -319,4 +319,39 @@ Public Class SecurityHelper
         End Try
     End Function
     
+    ' SECURITY FIX: Create safe SQL command
+    Public Shared Function CreateSafeCommand(query As String, connection As SqlConnection) As SqlCommand
+        ' Validate query for dangerous patterns
+        If ContainsDangerousPatterns(query) Then
+            LogSecurityEvent("Potentially dangerous SQL query detected: " & query)
+            Throw New SecurityException("Invalid SQL query")
+        End If
+        
+        Return New SqlCommand(query, connection)
+    End Function
+    
+    ' SECURITY FIX: Sanitize for HTML output
+    Public Shared Function SanitizeForHtml(input As String) As String
+        If String.IsNullOrEmpty(input) Then
+            Return String.Empty
+        End If
+        
+        Return HttpUtility.HtmlEncode(input)
+    End Function
+    
+    ' SECURITY FIX: Sanitize for JavaScript output
+    Public Shared Function SanitizeForJavaScript(input As String) As String
+        If String.IsNullOrEmpty(input) Then
+            Return String.Empty
+        End If
+        
+        ' Escape special characters for JavaScript
+        Return input.Replace("\", "\\") _
+                   .Replace("'", "\'") _
+                   .Replace("""", "\""") _
+                   .Replace(vbCr, "\r") _
+                   .Replace(vbLf, "\n") _
+                   .Replace("<", "&lt;") _
+                   .Replace(">", "&gt;")
+    End Function
 End Class
