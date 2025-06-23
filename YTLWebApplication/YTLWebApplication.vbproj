@@ -594,6 +594,206 @@
       <DependentUpon>OssMonthReport.aspx</DependentUpon>
       <SubType>ASPXCodeBehind</SubType>
     </Compile>
+    <Compile Include="O\help.aspx.designer.vb">
+      <DependentUpon>help.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\help.aspx.vb">
+      <DependentUpon>help.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="O\HistoryReport.aspx.designer.vb">
+      <DependentUpon>HistoryReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\HistoryReport.aspx.vb">
+      <DependentUpon>HistoryReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\hLogin.aspx.designer.vb">
+      <DependentUpon>hLogin.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\hLogin.aspx.vb">
+      <DependentUpon>hLogin.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\IdlingExcelReport.aspx.designer.vb">
+      <DependentUpon>IdlingExcelReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\IdlingExcelReport.aspx.vb">
+      <DependentUpon>IdlingExcelReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\InsertPoll.aspx.designer.vb">
+      <DependentUpon>InsertPoll.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\InsertPoll.aspx.vb">
+      <DependentUpon>InsertPoll.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\InstantAlertSettingsManagement.aspx.designer.vb">
+      <DependentUpon>InstantAlertSettingsManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\InstantAlertSettingsManagement.aspx.vb">
+      <DependentUpon>InstantAlertSettingsManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\IVMSUnitList.aspx.designer.vb">
+      <DependentUpon>IVMSUnitList.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\IVMSUnitList.aspx.vb">
+      <DependentUpon>IVMSUnitList.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\JournalReport2.aspx.designer.vb">
+      <DependentUpon>JournalReport2.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\JournalReport2.aspx.vb">
+      <DependentUpon>JournalReport2.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\KpiApk.aspx.designer.vb">
+      <DependentUpon>KpiApk.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\KpiApk.aspx.vb">
+      <DependentUpon>KpiApk.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargeAddInstantAlertSettings.aspx.designer.vb">
+      <DependentUpon>LafargeAddInstantAlertSettings.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargeAddInstantAlertSettings.aspx.vb">
+      <DependentUpon>LafargeAddInstantAlertSettings.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargeDriverSubmissionReport.aspx.designer.vb">
+      <DependentUpon>LafargeDriverSubmissionReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargeDriverSubmissionReport.aspx.vb">
+      <DependentUpon>LafargeDriverSubmissionReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargeGeofenceSummaryReport.aspx.designer.vb">
+      <DependentUpon>LafargeGeofenceSummaryReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargeGeofenceSummaryReport.aspx.vb">
+      <DependentUpon>LafargeGeofenceSummaryReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargeInstantAlertSettingsManagement.aspx.designer.vb">
+      <DependentUpon>LafargeInstantAlertSettingsManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargeInstantAlertSettingsManagement.aspx.vb">
+      <DependentUpon>LafargeInstantAlertSettingsManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargePrivateGeofenceAlertManagement.aspx.designer.vb">
+      <DependentUpon>LafargePrivateGeofenceAlertManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargePrivateGeofenceAlertManagement.aspx.vb">
+      <DependentUpon>LafargePrivateGeofenceAlertManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargeVDM.aspx.designer.vb">
+      <DependentUpon>LafargeVDM.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LafargeVDM.aspx.vb">
+      <DependentUpon>LafargeVDM.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LiveTrack.aspx.designer.vb">
+      <DependentUpon>LiveTrack.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\LiveTrack.aspx.vb">
+      <DependentUpon>LiveTrack.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\loadplatejson.aspx.designer.vb">
+      <DependentUpon>loadplatejson.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\loadplatejson.aspx.vb">
+      <DependentUpon>loadplatejson.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\MapSettingsManagement.aspx.designer.vb">
+      <DependentUpon>MapSettingsManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\MapSettingsManagement.aspx.vb">
+      <DependentUpon>MapSettingsManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\MOdometerDetails.aspx.designer.vb">
+      <DependentUpon>MOdometerDetails.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\MOdometerDetails.aspx.vb">
+      <DependentUpon>MOdometerDetails.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\NumberOfAlerts.aspx.designer.vb">
+      <DependentUpon>NumberOfAlerts.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\NumberOfAlerts.aspx.vb">
+      <DependentUpon>NumberOfAlerts.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OhsasVehicleDaily.aspx.designer.vb">
+      <DependentUpon>OhsasVehicleDaily.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OhsasVehicleDaily.aspx.vb">
+      <DependentUpon>OhsasVehicleDaily.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OhsasVehicleDailySpeedratings.aspx.designer.vb">
+      <DependentUpon>OhsasVehicleDailySpeedratings.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OhsasVehicleDailySpeedratings.aspx.vb">
+      <DependentUpon>OhsasVehicleDailySpeedratings.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OhsasVehicleDailysummary.aspx.designer.vb">
+      <DependentUpon>OhsasVehicleDailysummary.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OhsasVehicleDailysummary.aspx.vb">
+      <DependentUpon>OhsasVehicleDailysummary.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OhsasVehicleMonthlySpeedratings.aspx.designer.vb">
+      <DependentUpon>OhsasVehicleMonthlySpeedratings.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OhsasVehicleMonthlySpeedratings.aspx.vb">
+      <DependentUpon>OhsasVehicleMonthlySpeedratings.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OhsasVehicleWeeklysummary.aspx.designer.vb">
+      <DependentUpon>OhsasVehicleWeeklysummary.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OhsasVehicleWeeklysummary.aspx.vb">
+      <DependentUpon>OhsasVehicleWeeklysummary.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OperatorManagement.aspx.designer.vb">
+      <DependentUpon>OperatorManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OperatorManagement.aspx.vb">
+      <DependentUpon>OperatorManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\orderCreation.aspx.designer.vb">
+      <DependentUpon>orderCreation.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\orderCreation.aspx.vb">
+      <DependentUpon>orderCreation.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\orderDeliveryMoniterReport.aspx.designer.vb">
+      <DependentUpon>orderDeliveryMoniterReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\orderDeliveryMoniterReport.aspx.vb">
+      <DependentUpon>orderDeliveryMoniterReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OSSAreaCodeManagement.aspx.designer.vb">
+      <DependentUpon>OSSAreaCodeManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OSSAreaCodeManagement.aspx.vb">
+      <DependentUpon>OSSAreaCodeManagement.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OssDailyDispatchReport.aspx.designer.vb">
+      <DependentUpon>OssDailyDispatchReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OssDailyDispatchReport.aspx.vb">
+      <DependentUpon>OssDailyDispatchReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OssDashboard.aspx.designer.vb">
+      <DependentUpon>OssDashboard.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OssDashboard.aspx.vb">
+      <DependentUpon>OssDashboard.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OssDashboardDaily.aspx.designer.vb">
+      <DependentUpon>OssDashboardDaily.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OssDashboardDaily.aspx.vb">
+      <DependentUpon>OssDashboardDaily.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OssDayReport.aspx.designer.vb">
+      <DependentUpon>OssDayReport.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="O\OssDayReport.aspx.vb">
+      <DependentUpon>OssDayReport.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
     <Compile Include="PrivateGeofenceSummaryReportTQuarry.aspx.designer.vb">
       <DependentUpon>PrivateGeofenceSummaryReportTQuarry.aspx</DependentUpon>
     </Compile>
@@ -3438,6 +3638,39 @@
     <Content Include="Logs\README.txt" />
     <Content Include="OssDayReport.aspx" />
     <Content Include="OssMonthReport.aspx" />
+    <Content Include="O\help.aspx" />
+    <Content Include="O\HistoryReport.aspx" />
+    <Content Include="O\hLogin.aspx" />
+    <Content Include="O\IdlingExcelReport.aspx" />
+    <Content Include="O\InsertPoll.aspx" />
+    <Content Include="O\InstantAlertSettingsManagement.aspx" />
+    <Content Include="O\IVMSUnitList.aspx" />
+    <Content Include="O\JournalReport2.aspx" />
+    <Content Include="O\KpiApk.aspx" />
+    <Content Include="O\LafargeAddInstantAlertSettings.aspx" />
+    <Content Include="O\LafargeDriverSubmissionReport.aspx" />
+    <Content Include="O\LafargeGeofenceSummaryReport.aspx" />
+    <Content Include="O\LafargeInstantAlertSettingsManagement.aspx" />
+    <Content Include="O\LafargePrivateGeofenceAlertManagement.aspx" />
+    <Content Include="O\LafargeVDM.aspx" />
+    <Content Include="O\LiveTrack.aspx" />
+    <Content Include="O\loadplatejson.aspx" />
+    <Content Include="O\MapSettingsManagement.aspx" />
+    <Content Include="O\MOdometerDetails.aspx" />
+    <Content Include="O\NumberOfAlerts.aspx" />
+    <Content Include="O\OhsasVehicleDaily.aspx" />
+    <Content Include="O\OhsasVehicleDailySpeedratings.aspx" />
+    <Content Include="O\OhsasVehicleDailysummary.aspx" />
+    <Content Include="O\OhsasVehicleMonthlySpeedratings.aspx" />
+    <Content Include="O\OhsasVehicleWeeklysummary.aspx" />
+    <Content Include="O\OperatorManagement.aspx" />
+    <Content Include="O\orderCreation.aspx" />
+    <Content Include="O\orderDeliveryMoniterReport.aspx" />
+    <Content Include="O\OSSAreaCodeManagement.aspx" />
+    <Content Include="O\OssDailyDispatchReport.aspx" />
+    <Content Include="O\OssDashboard.aspx" />
+    <Content Include="O\OssDashboardDaily.aspx" />
+    <Content Include="O\OssDayReport.aspx" />
     <Content Include="PrivateGeofenceSummaryReportTQuarry.aspx" />
     <Content Include="OSSAreaCodeManagement.aspx" />
     <Content Include="AllVehiclesSummaryReportA.aspx" />
